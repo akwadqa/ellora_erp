@@ -1,6 +1,6 @@
 frappe.ui.form.on("Sales Invoice Item", "custom_stock_info", function(frm, cdt, cdn) {
-    var child_doc = locals[cdt][cdn];
-    var item_code = child_doc.item_code;
+    let child_doc = locals[cdt][cdn];
+    let item_code = child_doc.item_code;
 
 	const dialog = new frappe.ui.Dialog({
         title: __('Stock Monitor'),
@@ -79,8 +79,8 @@ function get_stock_info(item, dialog) {
 
 
 frappe.ui.form.on("Sales Invoice Item", "custom_item_sales_history", function(frm, cdt, cdn) {
-    var child_doc = locals[cdt][cdn];
-    var item_code = child_doc.item_code;
+    let child_doc = locals[cdt][cdn];
+    let item_code = child_doc.item_code;
 
     const dialog = new frappe.ui.Dialog({
         title: __('Item Sales History'),
@@ -116,9 +116,10 @@ frappe.ui.form.on("Sales Invoice Item", "custom_item_sales_history", function(fr
                     { fieldtype: 'Data', fieldname: 'customer_name', label: __('Customer Name'), in_list_view: 1, read_only: 1, columns: 2 },
                     { fieldtype: 'Link', options: 'Sales Invoice', fieldname: 'sales_invoice', label: __('Sales Invoice'), in_list_view: 1, read_only: 1, columns: 2 },
                     { fieldtype: 'Data', fieldname: 'posting_date', label: __('Posting Date'), in_list_view: 1, read_only: 1, columns: 1 },
-                    { fieldtype: 'Link', options: 'Item', fieldname: 'item_code', label: __('Item Code'), in_list_view: 1, read_only: 1, columns: 3 },
+                    { fieldtype: 'Link', options: 'Item', fieldname: 'item_code', label: __('Item Code'), in_list_view: 1, read_only: 1, columns: 2 },
                     { fieldtype: 'Data', fieldname: 'qty', label: __('Quantity'), in_list_view: 1, read_only: 1, columns: 1 },
-                    { fieldtype: 'Currency', fieldname: 'rate', label: __('Rate'), in_list_view: 1, read_only: 1, columns: 1 }
+                    { fieldtype: 'Currency', fieldname: 'rate', label: __('Rate'), in_list_view: 1, read_only: 1, columns: 1 },
+                    { fieldtype: 'Link', options: 'UOM', fieldname: 'uom', label: __('UOM'), in_list_view: 1, read_only: 1, columns: 1 }
                 ],
                 data: [],
                 get_data: function() {
@@ -192,3 +193,64 @@ function format_date(date_string) {
     const day = date.getDate().toString().padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
+
+
+
+
+
+// Valuation Rate
+frappe.ui.form.on("Sales Invoice Item", {
+    item_code: function(frm, cdt, cdn) {
+        let row = locals[cdt][cdn];
+
+        // delay added incase the server is slow in retrieving row data such as the warehouse
+        setTimeout(function() {
+            if (row.item_code && row.warehouse && frm.doc.is_internal_customer) {
+                frappe.call({
+                    method: 'ellora.api.get_valuation_rate',
+                    args: {
+                        item_code: row.item_code,
+                        warehouse: row.warehouse
+                    },
+                    callback: function(r) {
+                        if (r.message) {
+                            frappe.model.set_value(cdt, cdn, 'custom_valuation_rate', r.message);
+                        }
+                    }
+                });
+            }
+        }, 500);
+    }
+});
+
+
+
+
+
+// Make Purchase Invoice on_submit of Sales Invoice
+frappe.ui.form.on("Sales Invoice", {
+    on_submit: function(frm) {
+        if (frm.doc.is_internal_customer) {
+            // frappe.model.open_mapped_doc({
+            //     method: "erpnext.accounts.doctype.sales_invoice.sales_invoice.make_inter_company_purchase_invoice",
+            //     frm: frm,
+            // });
+
+            frappe.call({
+                method: "ellora.api.make_and_save_purchase_invoice",
+                args: {
+                    source_name: frm.doc.name
+                },
+                callback: function(r) {
+                    if (r.message) {
+                        frappe.msgprint({
+                            title: __('Purchase Invoice Created'),
+                            message: __('Purchase Invoice <a href="/app/purchase-invoice/{0}" target="_blank">{0}</a> created successfully.', [r.message]),
+                            indicator: 'green'
+                        });
+                    }
+                }
+            });
+        }
+    }
+});

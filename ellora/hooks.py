@@ -29,7 +29,11 @@ app_include_js = "/assets/ellora/js/custom_shortcuts.js"
 
 # include js in doctype views
 doctype_js = {
-    "Sales Invoice" : "public/js/custom_sales_invoice.js"
+    "Sales Invoice" : "public/js/custom_sales_invoice.js",
+    "Purchase Invoice" : "public/js/custom_purchase_invoice.js",
+    "Quotation": "public/js/custom_quotation.js",
+    "Delivery Note": "public/js/custom_delivery_note.js",
+    "Purchase Order": "public/js/custom_purchase_order.js"
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
