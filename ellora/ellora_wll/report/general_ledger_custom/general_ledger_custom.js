@@ -210,10 +210,10 @@ frappe.query_reports["General Ledger Custom"] = {
 			fieldtype: "Check",
 		},
 		{
-			"fieldname": "show_pdc_payments",
-			"label": __("Show PDC Payments"),
-			"fieldtype": "Check",
-			"default": 1
+			fieldname: "show_pdc_payments",
+			label: __("Show PDC Payments"),
+			fieldtype: "Check",
+			default: 1
 		}
 	],
 };
