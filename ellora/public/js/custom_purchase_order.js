@@ -113,3 +113,21 @@ function format_date(date_string) {
     const day = date.getDate().toString().padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
+
+
+
+
+
+frappe.ui.form.on("Purchase Order", {
+    setup: function (frm) {
+		["items"].forEach((d) => {
+			frm.fields_dict[d].grid.get_field("uom").get_query = function (doc, cdt, cdn) {
+				var row = locals[cdt][cdn];
+				return {
+					query: "ellora.api.get_item_uoms",
+					filters: { value: row.item_code },
+				};
+			};
+		});
+	},
+})

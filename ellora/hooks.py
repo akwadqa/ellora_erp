@@ -37,7 +37,11 @@ doctype_js = {
     "Purchase Invoice" : "public/js/custom_purchase_invoice.js",
     "Quotation": "public/js/custom_quotation.js",
     "Delivery Note": "public/js/custom_delivery_note.js",
-    "Purchase Order": "public/js/custom_purchase_order.js"
+    "Purchase Order": "public/js/custom_purchase_order.js",
+    "Sales Order": "public/js/custom_sales_order.js",
+    "Supplier Quotation": "public/js/custom_supplier_quotation.js",
+    "Material Request": "public/js/custom_material_request.js",
+    "Purchase Receipt": "public/js/custom_purchase_receipt.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}

@@ -229,6 +229,18 @@ frappe.ui.form.on("Sales Invoice Item", {
 
 // Make Purchase Invoice on_submit of Sales Invoice
 frappe.ui.form.on("Sales Invoice", {
+    setup: function (frm) {
+		["items"].forEach((d) => {
+			frm.fields_dict[d].grid.get_field("uom").get_query = function (doc, cdt, cdn) {
+				var row = locals[cdt][cdn];
+				return {
+					query: "ellora.api.get_item_uoms",
+					filters: { value: row.item_code },
+				};
+			};
+		});
+	},
+    
     on_submit: function(frm) {
         if (frm.doc.is_internal_customer) {
             // frappe.model.open_mapped_doc({

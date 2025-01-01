@@ -309,6 +309,30 @@ def get_purchase_invoice_item_sales_history(supplier=None, item=None):
 
 
 
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_item_uoms(doctype, txt, searchfield, start, page_len, filters):
+    """
+    Fetch UOMs from the UOM Conversion Detail child table of the Item doctype.
+    """
+
+    # filters = frappe.parse_json(filters) # Convert filters from JSON string to dict
+    item_code = filters.get("value")
+
+    if not item_code:
+        return []
+
+    return frappe.get_all(
+        "UOM Conversion Detail",
+        filters={"parent": item_code},
+        fields=["uom"],
+        as_list=1,
+    )
+
+
+
+
+
 # from frappe.model.mapper import get_mapped_doc
 # from frappe.utils import cstr, flt
 # from frappe.contacts.doctype.address.address import get_company_address
