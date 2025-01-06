@@ -1,5 +1,4 @@
 import frappe
-from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_inter_company_purchase_invoice
 
 @frappe.whitelist()
 def get_stock_info(sales_invoice=None, item=None):
@@ -99,11 +98,172 @@ def get_valuation_rate(item_code, warehouse):
 
 
 
+from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_received_items, validate_inter_company_transaction, get_inter_company_details, \
+                                                                    set_purchase_references, update_address, update_taxes
 @frappe.whitelist()
 def make_and_save_purchase_invoice(source_name):
     purchase_invoice = make_inter_company_purchase_invoice(source_name)
     purchase_invoice.save(ignore_permissions=True)
     return purchase_invoice.name
+
+def make_inter_company_purchase_invoice(source_name, target_doc=None):
+	return make_inter_company_transaction("Sales Invoice", source_name, target_doc)
+
+def make_inter_company_transaction(doctype, source_name, target_doc=None):
+    if doctype in ["Sales Invoice", "Sales Order"]:
+        source_doc = frappe.get_doc(doctype, source_name)
+        target_doctype = "Purchase Invoice" if doctype == "Sales Invoice" else "Purchase Order"
+        target_detail_field = "sales_invoice_item" if doctype == "Sales Invoice" else "sales_order_item"
+        source_document_warehouse_field = "target_warehouse"
+        target_document_warehouse_field = "from_warehouse"
+        received_items = get_received_items(source_name, target_doctype, target_detail_field)
+    else:
+        source_doc = frappe.get_doc(doctype, source_name)
+        target_doctype = "Sales Invoice" if doctype == "Purchase Invoice" else "Sales Order"
+        source_document_warehouse_field = "from_warehouse"
+        target_document_warehouse_field = "target_warehouse"
+        received_items = {}
+
+    validate_inter_company_transaction(source_doc, doctype)
+    details = get_inter_company_details(source_doc, doctype)
+
+    def set_missing_values(source, target):
+        target.run_method("set_missing_values")
+        set_purchase_references(target)
+
+    def update_details(source_doc, target_doc, source_parent):
+        target_doc.inter_company_invoice_reference = source_doc.name
+        if target_doc.doctype in ["Purchase Invoice", "Purchase Order"]:
+            currency = frappe.db.get_value("Supplier", details.get("party"), "default_currency")
+            target_doc.company = details.get("company")
+            target_doc.supplier = details.get("party")
+            target_doc.is_internal_supplier = 1
+            target_doc.ignore_pricing_rule = 1
+            target_doc.buying_price_list = source_doc.selling_price_list
+
+            # Invert Addresses
+            update_address(target_doc, "supplier_address", "address_display", source_doc.company_address)
+            update_address(
+                target_doc, "shipping_address", "shipping_address_display", source_doc.customer_address
+            )
+            update_address(
+                target_doc, "billing_address", "billing_address_display", source_doc.customer_address
+            )
+
+            if currency:
+                target_doc.currency = currency
+
+            update_taxes(
+                target_doc,
+                party=target_doc.supplier,
+                party_type="Supplier",
+                company=target_doc.company,
+                doctype=target_doc.doctype,
+                party_address=target_doc.supplier_address,
+                company_address=target_doc.shipping_address,
+            )
+
+            if target_doc.doctype == "Purchase Invoice":
+                target_doc.set_warehouse = None
+                target_doc.set_from_warehouse = None
+                target_doc.rejected_warehouse = None
+        else:
+            currency = frappe.db.get_value("Customer", details.get("party"), "default_currency")
+            target_doc.company = details.get("company")
+            target_doc.customer = details.get("party")
+            target_doc.selling_price_list = source_doc.buying_price_list
+
+            update_address(
+                target_doc, "company_address", "company_address_display", source_doc.supplier_address
+            )
+            update_address(
+                target_doc, "shipping_address_name", "shipping_address", source_doc.shipping_address
+            )
+            update_address(target_doc, "customer_address", "address_display", source_doc.shipping_address)
+
+            if currency:
+                target_doc.currency = currency
+
+            update_taxes(
+                target_doc,
+                party=target_doc.customer,
+                party_type="Customer",
+                company=target_doc.company,
+                doctype=target_doc.doctype,
+                party_address=target_doc.customer_address,
+                company_address=target_doc.company_address,
+                shipping_address_name=target_doc.shipping_address_name,
+            )
+
+    def update_item(source, target, source_parent):
+        target.qty = flt(source.qty) - received_items.get(source.name, 0.0)
+        if source.doctype == "Purchase Order Item" and target.doctype == "Sales Order Item":
+            target.purchase_order = source.parent
+            target.purchase_order_item = source.name
+            target.material_request = source.material_request
+            target.material_request_item = source.material_request_item
+
+        if (
+            source.get("purchase_order")
+            and source.get("purchase_order_item")
+            and target.doctype == "Purchase Invoice Item"
+        ):
+            target.purchase_order = source.purchase_order
+            target.po_detail = source.purchase_order_item
+
+        if target.doctype == "Purchase Invoice Item":
+            target.warehouse = None
+            target.rejected_warehouse = None
+
+    item_field_map = {
+        "doctype": target_doctype + " Item",
+        "field_no_map": ["income_account", "expense_account", "cost_center", "warehouse"],
+        "field_map": {
+            "rate": "rate",
+        },
+        "postprocess": update_item,
+        "condition": lambda doc: doc.qty > 0,
+    }
+
+    if doctype in ["Sales Invoice", "Sales Order"]:
+        item_field_map["field_map"].update(
+            {
+                "name": target_detail_field,
+            }
+        )
+
+    if source_doc.get("update_stock"):
+        item_field_map["field_map"].update(
+            {
+                source_document_warehouse_field: target_document_warehouse_field,
+                "batch_no": "batch_no",
+                "serial_no": "serial_no",
+            }
+        )
+    elif target_doctype == "Sales Order":
+        item_field_map["field_map"].update(
+            {
+                source_document_warehouse_field: "warehouse",
+            }
+        )
+
+    doclist = get_mapped_doc(
+        doctype,
+        source_name,
+        {
+            doctype: {
+                "doctype": target_doctype,
+                "postprocess": update_details,
+                "set_target_warehouse": "set_from_warehouse",
+                "field_no_map": ["taxes_and_charges", "set_warehouse", "shipping_address"],
+            },
+            doctype + " Item": item_field_map,
+        },
+        target_doc,
+        set_missing_values,
+    )
+
+    return doclist
 
 
 
@@ -333,151 +493,79 @@ def get_item_uoms(doctype, txt, searchfield, start, page_len, filters):
 
 
 
-# from frappe.model.mapper import get_mapped_doc
-# from frappe.utils import cstr, flt
-# from frappe.contacts.doctype.address.address import get_company_address
-# from frappe.model.utils import get_fetch_values
-# from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
-# from erpnext.stock.doctype.item.item import get_item_defaults
-# # Make Delivery Note from Quotation
-# @frappe.whitelist()
-# def make_delivery_note(source_name, target_doc=None, kwargs=None):
-# 	from erpnext.stock.doctype.packed_item.packed_item import make_packing_list
-# 	from erpnext.stock.doctype.stock_reservation_entry.stock_reservation_entry import (
-# 		get_sre_details_for_voucher,
-# 		get_sre_reserved_qty_details_for_voucher,
-# 		get_ssb_bundle_for_voucher,
-# 	)
+from frappe.model.mapper import get_mapped_doc
+from frappe.utils import cstr, flt
+from frappe.contacts.doctype.address.address import get_company_address
+from frappe.model.utils import get_fetch_values
+from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
+from erpnext.stock.doctype.item.item import get_item_defaults
+# Make Delivery Note from Quotation
+@frappe.whitelist()
+def make_delivery_note(source_name, target_doc=None):
+    from erpnext.stock.doctype.packed_item.packed_item import make_packing_list
 
-# 	if not kwargs:
-# 		kwargs = {
-# 			"for_reserved_stock": frappe.flags.args and frappe.flags.args.for_reserved_stock,
-# 			"skip_item_mapping": frappe.flags.args and frappe.flags.args.skip_item_mapping,
-# 		}
+    mapper = {
+        "Quotation": {"doctype": "Delivery Note", "validation": {"docstatus": ["=", 1]}},
+        "Sales Taxes and Charges": {"doctype": "Sales Taxes and Charges", "add_if_empty": True}
+    }
 
-# 	kwargs = frappe._dict(kwargs)
+    def set_missing_values(source, target):
+        frappe.log_error("smv")
+        target.run_method("set_missing_values")
+        target.run_method("set_po_nos")
+        target.run_method("calculate_taxes_and_totals")
+        target.run_method("set_use_serial_batch_fields")
 
-# 	sre_details = {}
-# 	if kwargs.for_reserved_stock:
-# 		sre_details = get_sre_reserved_qty_details_for_voucher("Quotation", source_name)
+        if source.company_address:
+            target.update({"company_address": source.company_address})
+        else:
+            # set company address
+            target.update(get_company_address(target.company))
 
-# 	mapper = {
-# 		"Quotation": {"doctype": "Delivery Note", "validation": {"docstatus": ["=", 1]}},
-# 		"Sales Taxes and Charges": {"doctype": "Sales Taxes and Charges", "add_if_empty": True},
-# 		"Sales Team": {"doctype": "Sales Team", "add_if_empty": True},
-# 	}
+        if target.company_address:
+            target.update(get_fetch_values("Delivery Note", "company_address", target.company_address))
 
-# 	def set_missing_values(source, target):
-# 		if kwargs.get("ignore_pricing_rule"):
-# 			# Skip pricing rule when the dn is creating from the pick list
-# 			target.ignore_pricing_rule = 1
+        # if invoked in bulk creation, validations are ignored and thus this method is nerver invoked
+        if frappe.flags.bulk_transaction:
+            # set target items names to ensure proper linking with packed_items
+            target.set_new_name()
 
-# 		target.run_method("set_missing_values")
-# 		target.run_method("set_po_nos")
-# 		target.run_method("calculate_taxes_and_totals")
-# 		target.run_method("set_use_serial_batch_fields")
+        make_packing_list(target)
 
-# 		if source.company_address:
-# 			target.update({"company_address": source.company_address})
-# 		else:
-# 			# set company address
-# 			target.update(get_company_address(target.company))
+    def condition(doc):
+        # make_mapped_doc sets js `args` into `frappe.flags.args`
+        if frappe.flags.args and frappe.flags.args.delivery_dates:
+            if cstr(doc.delivery_date) not in frappe.flags.args.delivery_dates:
+                return False
+        return True
 
-# 		if target.company_address:
-# 			target.update(get_fetch_values("Delivery Note", "company_address", target.company_address))
+    def update_item(source, target, source_parent):
+        target.base_amount = flt(source.qty) * flt(source.base_rate)
+        target.amount = flt(source.qty) * flt(source.rate)
+        target.qty = flt(source.qty)
 
-# 		# if invoked in bulk creation, validations are ignored and thus this method is nerver invoked
-# 		if frappe.flags.bulk_transaction:
-# 			# set target items names to ensure proper linking with packed_items
-# 			target.set_new_name()
+        item = get_item_defaults(target.item_code, source_parent.company)
+        item_group = get_item_group_defaults(target.item_code, source_parent.company)
 
-# 		make_packing_list(target)
+        if item:
+            target.cost_center = (
+                item.get("buying_cost_center")
+                or item_group.get("buying_cost_center")
+            )
 
-# 	def condition(doc):
-# 		if doc.name in sre_details:
-# 			del sre_details[doc.name]
-# 			return False
+    mapper["Quotation Item"] = {
+        "doctype": "Delivery Note Item",
+        "field_map": {
+            "rate": "rate"
+        },
+        "condition": condition,
+        "postprocess": update_item,
+    }
 
-# 		# make_mapped_doc sets js `args` into `frappe.flags.args`
-# 		if frappe.flags.args and frappe.flags.args.delivery_dates:
-# 			if cstr(doc.delivery_date) not in frappe.flags.args.delivery_dates:
-# 				return False
+    q = frappe.get_doc("Quotation", source_name)
+    target_doc = get_mapped_doc("Quotation", q.name, mapper, target_doc)
 
-# 		return abs(doc.delivered_qty) < abs(doc.qty) and doc.delivered_by_supplier != 1
+    # Should be called after mapping items.
+    set_missing_values(q, target_doc)
 
-# 	def update_item(source, target, source_parent):
-# 		target.base_amount = (flt(source.qty) - flt(source.delivered_qty)) * flt(source.base_rate)
-# 		target.amount = (flt(source.qty) - flt(source.delivered_qty)) * flt(source.rate)
-# 		target.qty = flt(source.qty) - flt(source.delivered_qty)
-
-# 		item = get_item_defaults(target.item_code, source_parent.company)
-# 		item_group = get_item_group_defaults(target.item_code, source_parent.company)
-
-# 		if item:
-# 			target.cost_center = (
-# 				frappe.db.get_value("Project", source_parent.project, "cost_center")
-# 				or item.get("buying_cost_center")
-# 				or item_group.get("buying_cost_center")
-# 			)
-
-# 	if not kwargs.skip_item_mapping:
-# 		mapper["Quotation Item"] = {
-# 			"doctype": "Delivery Note Item",
-# 			"field_map": {
-# 				"rate": "rate",
-# 				"name": "so_detail",
-# 				"parent": "against_sales_order",
-# 			},
-# 			"condition": condition,
-# 			"postprocess": update_item,
-# 		}
-
-# 	quotation = frappe.get_doc("Quotation", source_name)
-# 	target_doc = get_mapped_doc("Quotation", quotation.name, mapper, target_doc)
-
-# 	if not kwargs.skip_item_mapping and kwargs.for_reserved_stock:
-# 		sre_list = get_sre_details_for_voucher("Quotation", source_name)
-
-# 		if sre_list:
-
-# 			def update_dn_item(source, target, source_parent):
-# 				update_item(source, target, quotation)
-
-# 			quotation_items = {d.name: d for d in quotation.items if d.stock_reserved_qty}
-
-# 			for sre in sre_list:
-# 				if not condition(quotation_items[sre.voucher_detail_no]):
-# 					continue
-
-# 				dn_item = get_mapped_doc(
-# 					"Quotation Item",
-# 					sre.voucher_detail_no,
-# 					{
-# 						"Quotation Item": {
-# 							"doctype": "Delivery Note Item",
-# 							"field_map": {
-# 								"rate": "rate",
-# 								"name": "so_detail",
-# 								"parent": "against_sales_order",
-# 							},
-# 							"postprocess": update_dn_item,
-# 						}
-# 					},
-# 					ignore_permissions=True,
-# 				)
-
-# 				dn_item.qty = flt(sre.reserved_qty) * flt(dn_item.get("conversion_factor", 1))
-
-# 				if sre.reservation_based_on == "Serial and Batch" and (sre.has_serial_no or sre.has_batch_no):
-# 					dn_item.serial_and_batch_bundle = get_ssb_bundle_for_voucher(sre)
-
-# 				target_doc.append("items", dn_item)
-# 			else:
-# 				# Correct rows index.
-# 				for idx, item in enumerate(target_doc.items):
-# 					item.idx = idx + 1
-
-# 	# Should be called after mapping items.
-# 	set_missing_values(quotation, target_doc)
-
-# 	return target_doc
+    return target_doc

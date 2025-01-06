@@ -12,10 +12,7 @@ def validate_minimum_selling_rate(doc, method):
 
 
 
-def clear_default_warehouse(doc, method):
-    if doc.doctype == "Purchase Invoice":
-        doc.set_warehouse = None
-        doc.rejected_warehouse = None
-
-    elif doc.doctype == "Purchase Receipt":
-        doc.rejected_warehouse = None
+def clear_warehouse_fields(doc, method):
+    if doc.doctype == "Purchase Receipt":
+        for item in doc.items:
+            item.rejected_warehouse = None

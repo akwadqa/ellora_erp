@@ -149,11 +149,8 @@ doc_events = {
     "Delivery Note": {
         "validate": "ellora.hooks_call.validate_minimum_selling_rate"
 	},
-    "Purchase Invoice": {
-        "before_insert": "ellora.hooks_call.clear_default_warehouse"
-    },
     "Purchase Receipt": {
-        "before_insert": "ellora.hooks_call.clear_default_warehouse"
+        "before_insert": "ellora.hooks_call.clear_warehouse_fields"
     }
 }
 
