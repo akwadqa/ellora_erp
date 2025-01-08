@@ -5,8 +5,11 @@ from frappe import _
 def validate_minimum_selling_rate(doc, method):
     if doc.items:
         for item in doc.items:
-            if item.rate < frappe.db.get_value("Item", item.item_code, "custom_minimum_selling_rate"):
-                frappe.throw(_("Minimum selling rate exceeded for {0}: {1}").format(item.item_code, _(item.item_name)))
+            if item.rate:
+                minimum_selling_rate = frappe.db.get_value("Item", item.item_code, "custom_minimum_selling_rate")
+                if minimum_selling_rate and minimum_selling_rate > 0:
+                    if item.rate < minimum_selling_rate:
+                        frappe.throw(_("Minimum selling rate exceeded for {0}: {1}").format(item.item_code, _(item.item_name)))
 
 
 

@@ -144,8 +144,10 @@ def get_data(filters):
         conditions.append("pi.docstatus = 1")
     elif filters.get("Purchase_invoice_status") == "pending":
         conditions.append("(pi.docstatus IS NULL OR pi.docstatus = 0 )")
-    else:
-        conditions.append("(pi.docstatus IS NULL OR pi.docstatus <> 2 )")
+    elif filters.get("Purchase_invoice_status") == "cancelled":
+        conditions.append("(pi.docstatus = 2 )")
+    # else:
+    #     conditions.append("(pi.docstatus IS NULL OR pi.docstatus <> 2 )")
 
     
     if conditions:
@@ -169,8 +171,10 @@ def get_data(filters):
 
         if row['docstatus'] == 1:
             row['status'] = '<span class="indicator-pill green">Completed</span>'
+        elif row['docstatus'] == 2:
+            row['status'] = '<span class="indicator-pill red">Cancelled</span>'
         else:
-            row['status'] = '<span class="indicator-pill red">Pending</span>'       
+            row['status'] = '<span class="indicator-pill yellow">Pending</span>'       
 
 
         if last_sales_invoice == row['sales_invoice'] and last_customer_name == row['customer_name']:

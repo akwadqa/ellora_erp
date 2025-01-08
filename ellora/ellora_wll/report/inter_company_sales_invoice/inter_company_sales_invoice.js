@@ -46,6 +46,10 @@ frappe.query_reports["Inter Company Sales Invoice"] = {
 				{
 					label: __("Pending"),
 					value: "pending",
+				},
+				{
+					label: __("Cancelled"),
+					value: "cancelled",
 				}				
 			]
 		},

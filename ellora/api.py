@@ -167,6 +167,7 @@ def make_inter_company_transaction(doctype, source_name, target_doc=None):
                 target_doc.set_warehouse = None
                 target_doc.set_from_warehouse = None
                 target_doc.rejected_warehouse = None
+                target_doc.cost_center = None
         else:
             currency = frappe.db.get_value("Customer", details.get("party"), "default_currency")
             target_doc.company = details.get("company")
