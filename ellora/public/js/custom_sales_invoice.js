@@ -203,6 +203,8 @@ frappe.ui.form.on("Sales Invoice Item", {
     item_code: function(frm, cdt, cdn) {
         let row = locals[cdt][cdn];
 
+        frappe.model.set_value(cdt, cdn, "uom", null);
+
         // delay added incase the server is slow in retrieving row data such as the warehouse
         setTimeout(function() {
             if (row.item_code && row.warehouse && frm.doc.is_internal_customer) {
@@ -263,6 +265,17 @@ frappe.ui.form.on("Sales Invoice", {
                     }
                 }
             });
+        }
+    },
+
+    before_save: function(frm) {
+        if (frm.doc.is_pos) {
+            const total = frm.doc.disable_rounded_total ? frm.doc.grand_total : frm.doc.rounded_total;
+
+            if (total != frm.doc.paid_amount) {
+                const controller = new erpnext.accounts.SalesInvoiceController({ frm });
+                controller.set_pos_data();
+            }
         }
     }
 });

@@ -118,7 +118,7 @@ def get_payment_entries_for_bank_clearance(
 
 	if bank_account:
 		condition += "and bank_account = %(bank_account)s"
-	frappe.log_error(account)
+
 	payment_entries = frappe.db.sql(
 		f"""
 			select

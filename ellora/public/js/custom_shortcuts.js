@@ -91,14 +91,16 @@ frappe.ui.keys.add_shortcut({
     description: __('Item Sales History'),
     shortcut: 'shift+ctrl+h',
     action: function() {
-        if (cur_frm && cur_frm.doctype === 'Sales Invoice') {
-            item_sales_history_dialog();
+        const allowed_doctypes = ['Sales Invoice', 'Quotation', 'Purchase Order', 'Purchase Invoice', 'Delivery Note'];
+        
+        if (cur_frm && allowed_doctypes.includes(cur_frm.doctype)) {
+            item_sales_history_dialog(cur_frm.doctype);
         }
     },
     ignore_inputs: true
 });
 
-function item_sales_history_dialog() {
+function item_sales_history_dialog(doctype) {
     const dialog = new frappe.ui.Dialog({
         title: __('Item Sales History'),
         size: "extra-large",
@@ -121,7 +123,7 @@ function item_sales_history_dialog() {
                 options: 'Item',
                 reqd: 0,
                 change: function() {
-                    get_item_sales_history(dialog.get_value('customer'), dialog.get_value('item'), dialog);
+                    get_item_sales_history(doctype, dialog.get_value('customer'), dialog.get_value('item'), dialog);
                 }
             },
             {
@@ -130,8 +132,8 @@ function item_sales_history_dialog() {
                 fieldtype: 'Table',
                 fields: [
                     { fieldtype: 'Data', fieldname: 'customer_name', label: __('Customer Name'), in_list_view: 1, read_only: 1, columns: 2 },
-                    { fieldtype: 'Link', options: 'Sales Invoice', fieldname: 'sales_invoice', label: __('Sales Invoice'), in_list_view: 1, read_only: 1, columns: 2 },
-                    { fieldtype: 'Data', fieldname: 'posting_date', label: __('Posting Date'), in_list_view: 1, read_only: 1, columns: 1 },
+                    { fieldtype: 'Link', options: getFieldProperty(doctype, 'options'), fieldname: getFieldProperty(doctype, 'fieldname'), label: getFieldProperty(doctype, 'label'), in_list_view: 1, read_only: 1, columns: 2 },
+                    { fieldtype: 'Data', fieldname: getDateProperty(doctype, 'fieldname'), label: getDateProperty(doctype, 'label'), in_list_view: 1, read_only: 1, columns: 1 },
                     { fieldtype: 'Link', options: 'Item', fieldname: 'item_code', label: __('Item Code'), in_list_view: 1, read_only: 1, columns: 2 },
                     { fieldtype: 'Data', fieldname: 'qty', label: __('Quantity'), in_list_view: 1, read_only: 1, columns: 1 },
                     { fieldtype: 'Currency', fieldname: 'rate', label: __('Rate'), in_list_view: 1, read_only: 1, columns: 1 },
@@ -156,12 +158,25 @@ function item_sales_history_dialog() {
     });
 
     dialog.show();
-    get_item_sales_history(dialog.get_value('customer'), dialog.get_value('item'), dialog);
+    get_item_sales_history(doctype, dialog.get_value('customer'), dialog.get_value('item'), dialog);
 }
 
-function get_item_sales_history(customer, item, dialog) {
+function get_item_sales_history(doctype, customer, item, dialog) {
+    let method;
+    if (doctype == "Sales Invoice") {
+        method = 'ellora.api.get_item_sales_history';
+    } else if (doctype == "Delivery Note") {
+        method = 'ellora.api.get_delivery_note_item_sales_history';
+    } else if (doctype == "Quotation") {
+        method = 'ellora.api.get_quotation_item_sales_history';
+    } else if (doctype == "Purchase Order") {
+        method = 'ellora.api.get_purchase_order_item_sales_history';
+    } else if (doctype == "Purchase Invoice") {
+        method = 'ellora.api.get_purchase_invoice_item_sales_history';
+    }
+
     frappe.call({
-        method: 'ellora.api.get_item_sales_history',
+        method: method,
         args: {
             customer: customer,
             item: item
@@ -170,7 +185,11 @@ function get_item_sales_history(customer, item, dialog) {
             if (r.message) {
                 // Format the date
                 r.message.forEach(row => {
-                    row.posting_date = format_date(row.posting_date);
+                    if (doctype === "Quotation" || doctype === "Purchase Order") {
+                        row.transaction_date = format_date(row.transaction_date);
+                    } else {
+                        row.posting_date = format_date(row.posting_date);
+                    }
                 });
                 const table_field = dialog.fields_dict.items;
                 table_field.grid.df.data = r.message;
@@ -206,4 +225,64 @@ function format_date(date_string) {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
     return `${year}-${month}-${day}`;
+}
+
+
+function getFieldProperty(doctype, property) {
+    const properties = {
+        'Sales Invoice': {
+            fieldname: 'sales_invoice',
+            label: __('Sales Invoice'),
+            options: 'Sales Invoice'
+        },
+        'Quotation': {
+            fieldname: 'quotation',
+            label: __('Quotation'),
+            options: 'Quotation'
+        },
+        'Purchase Order': {
+            fieldname: 'purchase_order',
+            label: __('Purchase Order'),
+            options: 'Purchase Order'
+        },
+        'Purchase Invoice': {
+            fieldname: 'purchase_invoice',
+            label: __('Purchase Invoice'),
+            options: 'Purchase Invoice'
+        },
+        'Delivery Note': {
+            fieldname: 'delivery_note',
+            label: __('Delivery Note'),
+            options: 'Delivery Note'
+        }
+    };
+
+    return properties[doctype] ? properties[doctype][property] : null;
+}
+
+function getDateProperty(doctype, property) {
+    const properties = {
+        'Sales Invoice': {
+            fieldname: 'posting_date',
+            label: __('Posting Date')
+        },
+        'Quotation': {
+            fieldname: 'transaction_date',
+            label: __('Transaction Date')
+        },
+        'Purchase Order': {
+            fieldname: 'transaction_date',
+            label: __('Transaction Date')
+        },
+        'Purchase Invoice': {
+            fieldname: 'posting_date',
+            label: __('Posting Date')
+        },
+        'Delivery Note': {
+            fieldname: 'posting_date',
+            label: __('Posting Date')
+        }
+    };
+
+    return properties[doctype] ? properties[doctype][property] : null;
 }

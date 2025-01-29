@@ -1,3 +1,83 @@
+frappe.ui.form.on("Quotation Item", "custom_stock_info", function(frm, cdt, cdn) {
+    let child_doc = locals[cdt][cdn];
+    let item_code = child_doc.item_code;
+
+	const dialog = new frappe.ui.Dialog({
+        title: __('Stock Monitor'),
+        size: "extra-large",
+        fields: [
+            {
+                fieldname: 'item',
+                label: __('Item'),
+                fieldtype: 'Link',
+                options: 'Item',
+                reqd: 0,
+                default: item_code,
+                change: function() {
+                    get_stock_info(dialog.get_value('item'), dialog);
+                }
+            },
+            {
+                fieldname: 'stock_info',
+                label: __('Stock Info'),
+                fieldtype: 'HTML',
+            }
+        ]
+    });
+
+    dialog.show();
+    get_stock_info(dialog.get_value('item'), dialog);
+
+});
+
+function get_stock_info(item, dialog) {
+    frappe.call({
+        method: 'ellora.api.get_stock_info',
+        args: {
+            sales_invoice: cur_frm.doc.name,
+            item: item
+        },
+        callback: function(r) {
+            let html = '';
+
+            if (r.message && r.message.length) {
+                html = `
+                    <div style="max-height: 400px; overflow-y: auto; overflow-x: auto;">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>${__('Item Code')}</th>
+                                    <th>${__('Item Name')}</th>
+                                    <th>${__('UOM')}</th>
+                                    <th>${__('Warehouse')}</th>
+                                    <th>${__('Available Stock')}</th>
+                                    <th>${__('Reserved Stock')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+                r.message.forEach(row => {
+                    html += `<tr>
+                        <td>${row.item_code}</td>
+                        <td>${row.item_name}</td>
+                        <td>${row.stock_uom}</td>
+                        <td>${row.warehouse}</td>
+                        <td>${row.actual_qty}</td>
+                        <td>${row.reserved_qty}</td>
+                    </tr>`;
+                });
+
+                html += '</tbody></table></div>';
+            } else {
+                html = __('No data found');
+            }
+
+            dialog.fields_dict.stock_info.$wrapper.html(html);
+        }
+    });
+}
+
+
 frappe.ui.form.on("Quotation Item", "custom_quotation_item_sales_history", function(frm, cdt, cdn) {
     let child_doc = locals[cdt][cdn];
     let item_code = child_doc.item_code;
@@ -136,111 +216,86 @@ frappe.ui.form.on("Quotation", {
         if (frm.doc.docstatus === 1 && frappe.model.can_create("Delivery Note")) {
             frm.add_custom_button(
                 __("Delivery Note"),
-                () => frappe.msgprint("Test"),
+                () => make_delivery_note_based_on_delivery_date(frm),
                 __("Create")
             );
         }
-
-        // // Set query for the UOM field in the items table
-        // frm.set_query('uom', 'items', function (doc, cdt, cdn) {
-        //     const row = locals[cdt][cdn];
-        //     if (!row.item_code) {
-        //         // If no item_code is selected, do not apply any filter
-        //         return {};
-        //     }
-
-        //     // Fetch UOMs from the selected item's UOMs table
-        //     frappe.call({
-        //         method: "frappe.client.get",
-        //         args: {
-        //             doctype: "Item",
-        //             name: row.item_code,
-        //         },
-        //         callback: function (r) {
-        //             if (r.message) {
-        //                 const item = r.message;
-        //                 const uom_list = (item.uoms || []).map(uom_entry => uom_entry.uom);
-        //                 console.log(uom_list)
-        //                 // Dynamically update the query filter for the UOM field
-        //                 frm.fields_dict.items.grid.get_field('uom').get_query = function () {
-        //                     return {
-        //                         filters: {
-        //                             name: ["in", uom_list],
-        //                         },
-        //                     };
-        //                 };
-        //             }
-        //         },
-        //     });
-        // });
     },
+});
 
-    // custom_make_delivery_note_based_on_delivery_date(frm, for_reserved_stock = false) {
-	// 	var delivery_dates = frm.doc.items.map((i) => i.delivery_date);
-	// 	delivery_dates = [...new Set(delivery_dates)];
+function make_delivery_note_based_on_delivery_date(frm) {
+    var delivery_dates = frm.doc.items.map((i) => i.delivery_date);
+    delivery_dates = [...new Set(delivery_dates)];
 
-	// 	var item_grid = frm.fields_dict["items"].grid;
-	// 	if (!item_grid.get_selected().length && delivery_dates.length > 1) {
-	// 		var dialog = new frappe.ui.Dialog({
-	// 			title: __("Select Items based on Delivery Date"),
-	// 			fields: [{ fieldtype: "HTML", fieldname: "dates_html" }],
-	// 		});
+    var item_grid = frm.fields_dict["items"].grid;
+    if (!item_grid.get_selected().length && delivery_dates.length > 1) {
+        var dialog = new frappe.ui.Dialog({
+            title: __("Select Items based on Delivery Date"),
+            fields: [{ fieldtype: "HTML", fieldname: "dates_html" }],
+        });
 
-	// 		var html = $(`
-	// 			<div style="border: 1px solid #d1d8dd">
-	// 				<div class="list-item list-item--head">
-	// 					<div class="list-item__content list-item__content--flex-2">
-	// 						${__("Delivery Date")}
-	// 					</div>
-	// 				</div>
-	// 				${delivery_dates
-	// 					.map(
-	// 						(date) => `
-	// 					<div class="list-item">
-	// 						<div class="list-item__content list-item__content--flex-2">
-	// 							<label>
-	// 							<input type="checkbox" data-date="${date}" checked="checked"/>
-	// 							${frappe.datetime.str_to_user(date)}
-	// 							</label>
-	// 						</div>
-	// 					</div>
-	// 				`
-	// 					)
-	// 					.join("")}
-	// 			</div>
-	// 		`);
+        var html = $(`
+            <div style="border: 1px solid #d1d8dd">
+                <div class="list-item list-item--head">
+                    <div class="list-item__content list-item__content--flex-2">
+                        ${__("Delivery Date")}
+                    </div>
+                </div>
+                ${delivery_dates
+                    .map(
+                        (date) => `
+                    <div class="list-item">
+                        <div class="list-item__content list-item__content--flex-2">
+                            <label>
+                            <input type="checkbox" data-date="${date}" checked="checked"/>
+                            ${frappe.datetime.str_to_user(date)}
+                            </label>
+                        </div>
+                    </div>
+                `
+                    )
+                    .join("")}
+            </div>
+        `);
 
-	// 		var wrapper = dialog.fields_dict.dates_html.$wrapper;
-	// 		wrapper.html(html);
+        var wrapper = dialog.fields_dict.dates_html.$wrapper;
+        wrapper.html(html);
 
-	// 		dialog.set_primary_action(__("Select"), function () {
-	// 			var dates = wrapper
-	// 				.find("input[type=checkbox]:checked")
-	// 				.map((i, el) => $(el).attr("data-date"))
-	// 				.toArray();
+        dialog.set_primary_action(__("Select"), function () {
+            var dates = wrapper
+                .find("input[type=checkbox]:checked")
+                .map((i, el) => $(el).attr("data-date"))
+                .toArray();
 
-	// 			if (!dates) return;
+            if (!dates) return;
 
-	// 			frm.events.custom_make_delivery_note(frm, dates, for_reserved_stock);
-	// 			dialog.hide();
-	// 		});
-	// 		dialog.show();
-	// 	} else {
-	// 		frm.events.custom_make_delivery_note([], for_reserved_stock);
-	// 	}
-	// },
+            make_delivery_note(frm, DataTransferItem);
+            dialog.hide();
+        });
+        dialog.show();
+    } else {
+        make_delivery_note(frm, []);
+    }
+}
 
-	// custom_make_delivery_note(frm, delivery_dates, for_reserved_stock = false) {
-	// 	frappe.model.open_mapped_doc({
-	// 		method: "ellora.api.make_delivery_note",
-	// 		args: {
-    //             source_name: frm.doc.name,
-	// 			delivery_dates,
-	// 			for_reserved_stock: for_reserved_stock,
-	// 		},
-	// 		freeze: true,
-	// 		freeze_message: __("Creating Delivery Note ..."),
-	// 	});
-	// }
+function make_delivery_note(frm, delivery_dates) {
+    frappe.model.open_mapped_doc({
+        method: "ellora.api.make_delivery_note",
+        frm: frm,
+        args: {
+            delivery_dates
+        },
+        freeze: true,
+        freeze_message: __("Creating Delivery Note ..."),
+    });
+}
 
+
+
+
+
+frappe.ui.form.on("Quotation Item", {
+    item_code: function (frm, cdt, cdn) {
+        frappe.model.set_value(cdt, cdn, "uom", null);
+    }
 });

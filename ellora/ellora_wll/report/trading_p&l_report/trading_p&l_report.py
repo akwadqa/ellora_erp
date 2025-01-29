@@ -137,9 +137,10 @@ def get_opening_balance(filters):
 		ON
 			gle.account = acc.name
 		WHERE
-			gle.company = %(company)s
-			AND acc.account_type = 'Stock'
-			AND (gle.posting_date < %(period_start_date)s OR gle.is_opening = 'Yes')
+			gle.company = %(company)s 
+			AND acc.account_type = 'Stock' 
+			AND (gle.posting_date < %(period_start_date)s OR gle.is_opening = 'Yes') 
+			AND is_cancelled = 0
 	""", {
 		"company": filters.company,
 		"period_start_date": filters.period_start_date,
@@ -163,14 +164,14 @@ def get_income_data(filters, period_list, opening_balance):
 	income.append(sales_return_data)
 
 	direct_income_data = get_direct_income_data(filters, period_list)
-	income.append(direct_income_data)
+	income.extend(direct_income_data)
 
 	opening_balance_row = {"account": "Closing Balance", "row_total": opening_balance}
 	for period in period_list:
 		opening_balance_row[period["key"]] = None
 	income.append(opening_balance_row)
 
-	last_row_total = sales_data['row_total'] - sales_return_data['row_total'] + direct_income_data['row_total'] + opening_balance_row['row_total']
+	last_row_total = sales_data['row_total'] - sales_return_data['row_total'] + direct_income_data[0]['row_total'] + opening_balance_row['row_total']
 	last_row = {"account": "Total", "row_total": last_row_total}
 	for period in period_list:
 		last_row[period["key"]] = None
@@ -189,6 +190,7 @@ def get_sales_data(filters, period_list):
 		"company": filters.get("company"),
 		"voucher_type": "Sales Invoice",
 		"voucher_subtype": "Debit Note",
+		"is_cancelled": 0
 	}
 	if filters.get("branch") and len(filters.get("branch")) > 0:
 		base_filters["branch"] = ["in", filters.get("branch")]
@@ -226,6 +228,7 @@ def get_sales_return_data(filters, period_list):
 		"company": filters.get("company"),
 		"voucher_type": "Sales Invoice",
 		"voucher_subtype": "Credit Note",
+		"is_cancelled": 0
 	}
 	if filters.get("branch") and len(filters.get("branch")) > 0:
 		base_filters["branch"] = ["in", filters.get("branch")]
@@ -253,48 +256,77 @@ def get_sales_return_data(filters, period_list):
 	return sales_return_data
 
 
-def get_direct_income_data(filters, period_list):
-	# Initialize direct income data row
-	direct_income_data = {"account": "Direct Income"}
 
-	total_direct_income = 0
+def get_direct_income_data(filters, period_list):
+	# Initialize direct income data
+	direct_income_data = [{"account": "Direct Income", "row_total": 0}]
 
 	# Fetch all accounts with account_type = 'Direct Income'
 	direct_income_accounts = frappe.get_all(
 		"Account",
 		filters={"account_type": "Direct Income", "company": filters.get("company")},
-		pluck="name"
+		fields=["name", "is_group"]
 	)
 
-	base_filters = {
-		"company": filters.get("company"),
-		"account": ["in", direct_income_accounts],
-	}
-	if filters.get("branch") and len(filters.get("branch")) > 0:
-		base_filters["branch"] = ["in", filters.get("branch")]
-	
-	for period in period_list:
-		period_filters = base_filters.copy()
-		period_filters["posting_date"] = ["between", [period["from_date"], period["to_date"]]]
-	
-		# Fetch GL Entry totals for this period
-		direct_income_total = frappe.get_all(
-			"GL Entry",
-			filters=period_filters,
-			fields=["SUM(credit) - SUM(debit) as total"]
-		)
-		
-		period_direct_income_total = direct_income_total[0].total if direct_income_total and direct_income_total[0].total else 0
+	for account in direct_income_accounts:
+		account_data = [{"indent": 1, "account": account["name"], "row_total": 0}]
 
-		# Add the total to the corresponding period key
-		direct_income_data[period["key"]] = period_direct_income_total
-		# Accumulate the total direct income for all periods
-		total_direct_income += period_direct_income_total
+		base_filters = {
+			"company": filters.get("company"),
+			"account": account["name"],
+		}
+
+		if filters.get("branch") and len(filters.get("branch")) > 0:
+			base_filters["branch"] = ["in", filters.get("branch")]
 	
-	direct_income_data["row_total"] = total_direct_income
+		for period in period_list:
+			period_filters = base_filters.copy()
+			period_filters["posting_date"] = ["between", [period["from_date"], period["to_date"]]]
+		
+			# Fetch GL Entry totals for this period
+			direct_income_total = frappe.get_all(
+				"GL Entry",
+				filters=period_filters,
+				fields=["SUM(credit) - SUM(debit) as total"]
+			)
+
+			period_direct_income_total = direct_income_total[0].total if direct_income_total and direct_income_total[0].total else 0
+
+			# Add the total to the corresponding period key for the account
+			account_data[0][period["key"]] = period_direct_income_total
+			
+			# Initialize the key if it doesn't exist for parent row
+			if period["key"] not in direct_income_data[0]:
+				direct_income_data[0][period["key"]] = 0
+
+			# Add the total to the corresponding period key for parent row
+			direct_income_data[0][period["key"]] += period_direct_income_total
+
+			# Accumulate the total direct income for the account
+			account_data[0]["row_total"] += period_direct_income_total
+
+			# Accumulate the total direct income for parent row
+			direct_income_data[0]["row_total"] += period_direct_income_total
+		
+		# If the account is a group, fetch its children recursively
+		if account.get("is_group"):
+			child_accounts = get_child_account_data(account=account["name"], indent=2, filters=filters, period_list=period_list, account_type="Direct Income")
+			account_data.extend(child_accounts["data"])
+
+			# Accumulate period totals for the current account and parent row
+			for period in period_list:
+				account_data[0][period["key"]] += child_accounts["period_totals"][period["key"]]
+				direct_income_data[0][period["key"]] += child_accounts["period_totals"][period["key"]]
+
+			# Accumulate row totals for the current account
+			account_data[0]["row_total"] += child_accounts["row_totals"]
+			# Accumulate row totals for parent row
+			direct_income_data[0]["row_total"] += child_accounts["row_totals"]
+		
+		if account_data[0]["row_total"] > 0:
+			direct_income_data.extend(account_data)
 
 	return direct_income_data
-
 
 
 
@@ -313,14 +345,14 @@ def get_expense_data(filters, period_list, opening_balance):
 	expense.append(purchase_return_data)
 
 	direct_expense_data = get_direct_expense_data(filters, period_list)
-	expense.append(direct_expense_data)
+	expense.extend(direct_expense_data)
 
 	opening_balance_row = {"account": "Opening Balance", "row_total": opening_balance}
 	for period in period_list:
 		opening_balance_row[period["key"]] = None
 	expense.append(opening_balance_row)
 
-	last_row_total = purchase_data['row_total'] - purchase_return_data['row_total'] + direct_expense_data['row_total'] + opening_balance_row['row_total']
+	last_row_total = purchase_data['row_total'] - purchase_return_data['row_total'] + direct_expense_data[0]['row_total'] + opening_balance_row['row_total']
 	last_row = {"account": "Total", "row_total": last_row_total}
 	for period in period_list:
 		last_row[period["key"]] = None
@@ -339,6 +371,7 @@ def get_purchase_data(filters, period_list):
 		"company": filters.get("company"),
 		"voucher_type": "Purchase Invoice",
 		"voucher_subtype": "Credit Note",
+		"is_cancelled": 0
 	}
 	if filters.get("branch") and len(filters.get("branch")) > 0:
 		base_filters["branch"] = ["in", filters.get("branch")]
@@ -376,6 +409,7 @@ def get_purchase_return_data(filters, period_list):
 		"company": filters.get("company"),
 		"voucher_type": "Purchase Invoice",
 		"voucher_subtype": "Debit Note",
+		"is_cancelled": 0
 	}
 	if filters.get("branch") and len(filters.get("branch")) > 0:
 		base_filters["branch"] = ["in", filters.get("branch")]
@@ -404,44 +438,73 @@ def get_purchase_return_data(filters, period_list):
 
 
 def get_direct_expense_data(filters, period_list):
-	# Initialize direct expense data row
-	direct_expense_data = {"account": "Direct Expense"}
+	# Initialize direct expense data
+	direct_expense_data = [{"account": "Direct Expense", "row_total": 0}]
 
-	total_direct_expense = 0
-
-	# Fetch all accounts with account_type = 'Direct Income'
+	# Fetch all accounts with account_type = 'Direct Expense'
 	direct_expense_accounts = frappe.get_all(
 		"Account",
 		filters={"account_type": "Direct Expense", "company": filters.get("company")},
-		pluck="name"
+		fields=["name", "is_group"]
 	)
 
-	base_filters = {
-		"company": filters.get("company"),
-		"account": ["in", direct_expense_accounts],
-	}
-	if filters.get("branch") and len(filters.get("branch")) > 0:
-		base_filters["branch"] = ["in", filters.get("branch")]
-	
-	for period in period_list:
-		period_filters = base_filters.copy()
-		period_filters["posting_date"] = ["between", [period["from_date"], period["to_date"]]]
-	
-		# Fetch GL Entry totals for this period
-		direct_expense_total = frappe.get_all(
-			"GL Entry",
-			filters=period_filters,
-			fields=["SUM(debit) - SUM(credit) as total"]
-		)
-		
-		period_direct_expense_total = direct_expense_total[0].total if direct_expense_total and direct_expense_total[0].total else 0
+	for account in direct_expense_accounts:
+		account_data = [{"indent": 1, "account": account["name"], "row_total": 0}]
 
-		# Add the total to the corresponding period key
-		direct_expense_data[period["key"]] = period_direct_expense_total
-		# Accumulate the total direct expense for all periods
-		total_direct_expense += period_direct_expense_total
+		base_filters = {
+			"company": filters.get("company"),
+			"account": account["name"],
+		}
+
+		if filters.get("branch") and len(filters.get("branch")) > 0:
+			base_filters["branch"] = ["in", filters.get("branch")]
 	
-	direct_expense_data["row_total"] = total_direct_expense
+		for period in period_list:
+			period_filters = base_filters.copy()
+			period_filters["posting_date"] = ["between", [period["from_date"], period["to_date"]]]
+		
+			# Fetch GL Entry totals for this period
+			direct_expense_total = frappe.get_all(
+				"GL Entry",
+				filters=period_filters,
+				fields=["SUM(debit) - SUM(credit) as total"]
+			)
+
+			period_direct_expense_total = direct_expense_total[0].total if direct_expense_total and direct_expense_total[0].total else 0
+
+			# Add the total to the corresponding period key for the account
+			account_data[0][period["key"]] = period_direct_expense_total
+			
+			# Initialize the key if it doesn't exist for parent row
+			if period["key"] not in direct_expense_data[0]:
+				direct_expense_data[0][period["key"]] = 0
+
+			# Add the total to the corresponding period key for parent row
+			direct_expense_data[0][period["key"]] += period_direct_expense_total
+
+			# Accumulate the total direct expense for the account
+			account_data[0]["row_total"] += period_direct_expense_total
+
+			# Accumulate the total direct expense for parent row
+			direct_expense_data[0]["row_total"] += period_direct_expense_total
+
+		# If the account is a group, fetch its children recursively
+		if account.get("is_group"):
+			child_accounts = get_child_account_data(account=account["name"], indent=2, filters=filters, period_list=period_list, account_type="Direct Expense")
+			account_data.extend(child_accounts["data"])
+
+			# Accumulate period totals for the current account and parent row
+			for period in period_list:
+				account_data[0][period["key"]] += child_accounts["period_totals"][period["key"]]
+				direct_expense_data[0][period["key"]] += child_accounts["period_totals"][period["key"]]
+
+			# Accumulate row totals for the current account
+			account_data[0]["row_total"] += child_accounts["row_totals"]
+			# Accumulate row totals for parent row
+			direct_expense_data[0]["row_total"] += child_accounts["row_totals"]
+		
+		if account_data[0]["row_total"] > 0:
+			direct_expense_data.extend(account_data)
 
 	return direct_expense_data
 
@@ -462,9 +525,9 @@ def get_net_profit_loss_data(filters, period_list, gross_profit_loss):
 	net_profit_loss.append(gross_loss_row)
 
 	indirect_income_data = get_indirect_income_data(filters, period_list)
-	net_profit_loss.append(indirect_income_data)
+	net_profit_loss.extend(indirect_income_data)
 
-	income_total = gross_loss_row['row_total'] + indirect_income_data['row_total']
+	income_total = gross_loss_row['row_total'] + indirect_income_data[0]['row_total']
 	income_total_row = {"account": "Total", "row_total": income_total}
 	for period in period_list:
 		income_total_row[period["key"]] = None
@@ -488,9 +551,9 @@ def get_net_profit_loss_data(filters, period_list, gross_profit_loss):
 	net_profit_loss.append(gross_profit_row)
 
 	indirect_expense_data = get_indirect_expense_data(filters, period_list)
-	net_profit_loss.append(indirect_expense_data)
+	net_profit_loss.extend(indirect_expense_data)
 
-	expense_total = gross_profit_row['row_total'] + indirect_expense_data['row_total']
+	expense_total = gross_profit_row['row_total'] + indirect_expense_data[0]['row_total']
 	expense_total_row = {"account": "Total", "row_total": expense_total}
 	for period in period_list:
 		expense_total_row[period["key"]] = None
@@ -502,86 +565,226 @@ def get_net_profit_loss_data(filters, period_list, gross_profit_loss):
 
 
 def get_indirect_income_data(filters, period_list):
-	# Initialize indirect income data row
-	indirect_income_data = {"account": "Indirect Income"}
-
-	total_indirect_income = 0
+	# Initialize indirect income data
+	indirect_income_data = [{"account": "Indirect Income", "row_total": 0}]
 
 	# Fetch all accounts with account_type = 'Indirect Income'
 	indirect_income_accounts = frappe.get_all(
 		"Account",
 		filters={"account_type": "Indirect Income", "company": filters.get("company")},
-		pluck="name"
+		fields=["name", "is_group"]
 	)
 
-	base_filters = {
-		"company": filters.get("company"),
-		"account": ["in", indirect_income_accounts],
-	}
-	if filters.get("branch") and len(filters.get("branch")) > 0:
-		base_filters["branch"] = ["in", filters.get("branch")]
-	
-	for period in period_list:
-		period_filters = base_filters.copy()
-		period_filters["posting_date"] = ["between", [period["from_date"], period["to_date"]]]
-	
-		# Fetch GL Entry totals for this period
-		indirect_income_total = frappe.get_all(
-			"GL Entry",
-			filters=period_filters,
-			fields=["SUM(credit) - SUM(debit) as total"]
-		)
-		
-		period_indirect_income_total = indirect_income_total[0].total if indirect_income_total and indirect_income_total[0].total else 0
+	for account in indirect_income_accounts:
+		account_data = [{"indent": 1, "account": account["name"], "row_total": 0}]
 
-		# Add the total to the corresponding period key
-		indirect_income_data[period["key"]] = period_indirect_income_total
-		# Accumulate the total indirect income for all periods
-		total_indirect_income += period_indirect_income_total
+		base_filters = {
+			"company": filters.get("company"),
+			"account": account["name"],
+		}
+
+		if filters.get("branch") and len(filters.get("branch")) > 0:
+			base_filters["branch"] = ["in", filters.get("branch")]
 	
-	indirect_income_data["row_total"] = total_indirect_income
+		for period in period_list:
+			period_filters = base_filters.copy()
+			period_filters["posting_date"] = ["between", [period["from_date"], period["to_date"]]]
+		
+			# Fetch GL Entry totals for this period
+			indirect_income_total = frappe.get_all(
+				"GL Entry",
+				filters=period_filters,
+				fields=["SUM(credit) - SUM(debit) as total"]
+			)
+			
+			period_indirect_income_total = indirect_income_total[0].total if indirect_income_total and indirect_income_total[0].total else 0
+
+			# Add the total to the corresponding period key for the account
+			account_data[0][period["key"]] = period_indirect_income_total
+			
+			# Initialize the key if it doesn't exist for parent row
+			if period["key"] not in indirect_income_data[0]:
+				indirect_income_data[0][period["key"]] = 0
+
+			# Add the total to the corresponding period key for parent row
+			indirect_income_data[0][period["key"]] += period_indirect_income_total
+
+			# Accumulate the total indirect income for the account
+			account_data[0]["row_total"] += period_indirect_income_total
+
+			# Accumulate the total indirect income for parent row
+			indirect_income_data[0]["row_total"] += period_indirect_income_total
+		
+		# If the account is a group, fetch its children recursively
+		if account.get("is_group"):
+			child_accounts = get_child_account_data(account=account["name"], indent=2, filters=filters, period_list=period_list, account_type="Indirect Income")
+			account_data.extend(child_accounts["data"])
+
+			# Accumulate period totals for the current account and parent row
+			for period in period_list:
+				account_data[0][period["key"]] += child_accounts["period_totals"][period["key"]]
+				indirect_income_data[0][period["key"]] += child_accounts["period_totals"][period["key"]]
+
+			# Accumulate row totals for the current account
+			account_data[0]["row_total"] += child_accounts["row_totals"]
+			# Accumulate row totals for parent row
+			indirect_income_data[0]["row_total"] += child_accounts["row_totals"]
+		
+		if account_data[0]["row_total"] > 0:
+			indirect_income_data.extend(account_data)
 
 	return indirect_income_data
 
 
-def get_indirect_expense_data(filters, period_list):
-	# Initialize indirect expense data row
-	indirect_expense_data = {"account": "Indirect Expense"}
 
-	total_indirect_expense = 0
+def get_indirect_expense_data(filters, period_list):
+	# Initialize indirect expense data
+	indirect_expense_data = [{"account": "Indirect Expense", "row_total": 0}]
 
 	# Fetch all accounts with account_type = 'Indirect Expense'
 	indirect_expense_accounts = frappe.get_all(
 		"Account",
 		filters={"account_type": "Indirect Expense", "company": filters.get("company")},
-		pluck="name"
+		fields=["name", "is_group"]
 	)
 
-	base_filters = {
-		"company": filters.get("company"),
-		"account": ["in", indirect_expense_accounts],
-	}
-	if filters.get("branch") and len(filters.get("branch")) > 0:
-		base_filters["branch"] = ["in", filters.get("branch")]
-	
-	for period in period_list:
-		period_filters = base_filters.copy()
-		period_filters["posting_date"] = ["between", [period["from_date"], period["to_date"]]]
-	
-		# Fetch GL Entry totals for this period
-		indirect_expense_total = frappe.get_all(
-			"GL Entry",
-			filters=period_filters,
-			fields=["SUM(debit) - SUM(credit) as total"]
-		)
-		
-		period_indirect_expense_total = indirect_expense_total[0].total if indirect_expense_total and indirect_expense_total[0].total else 0
+	for account in indirect_expense_accounts:
+		account_data = [{"indent": 1, "account": account["name"], "row_total": 0}]
 
-		# Add the total to the corresponding period key
-		indirect_expense_data[period["key"]] = period_indirect_expense_total
-		# Accumulate the total indirect expense for all periods
-		total_indirect_expense += period_indirect_expense_total
+		base_filters = {
+			"company": filters.get("company"),
+			"account": account["name"],
+		}
+
+		if filters.get("branch") and len(filters.get("branch")) > 0:
+			base_filters["branch"] = ["in", filters.get("branch")]
 	
-	indirect_expense_data["row_total"] = total_indirect_expense
+		for period in period_list:
+			period_filters = base_filters.copy()
+			period_filters["posting_date"] = ["between", [period["from_date"], period["to_date"]]]
+		
+			# Fetch GL Entry totals for this period
+			indirect_expense_total = frappe.get_all(
+				"GL Entry",
+				filters=period_filters,
+				fields=["SUM(debit) - SUM(credit) as total"]
+			)
+			
+			period_indirect_expense_total = indirect_expense_total[0].total if indirect_expense_total and indirect_expense_total[0].total else 0
+
+			# Add the total to the corresponding period key for the account
+			account_data[0][period["key"]] = period_indirect_expense_total
+			
+			# Initialize the key if it doesn't exist for parent row
+			if period["key"] not in indirect_expense_data[0]:
+				indirect_expense_data[0][period["key"]] = 0
+
+			# Add the total to the corresponding period key for parent row
+			indirect_expense_data[0][period["key"]] += period_indirect_expense_total
+
+			# Accumulate the total indirect expense for the account
+			account_data[0]["row_total"] += period_indirect_expense_total
+
+			# Accumulate the total indirect expense for parent row
+			indirect_expense_data[0]["row_total"] += period_indirect_expense_total
+		
+		# If the account is a group, fetch its children recursively
+		if account.get("is_group"):
+			child_accounts = get_child_account_data(account=account["name"], indent=2, filters=filters, period_list=period_list, account_type="Indirect Expense")
+			account_data.extend(child_accounts["data"])
+
+			# Accumulate period totals for the current account and parent row
+			for period in period_list:
+				account_data[0][period["key"]] += child_accounts["period_totals"][period["key"]]
+				indirect_expense_data[0][period["key"]] += child_accounts["period_totals"][period["key"]]
+
+			# Accumulate row totals for the current account
+			account_data[0]["row_total"] += child_accounts["row_totals"]
+			# Accumulate row totals for parent row
+			indirect_expense_data[0]["row_total"] += child_accounts["row_totals"]
+		
+		if account_data[0]["row_total"] > 0:
+			indirect_expense_data.extend(account_data)
 
 	return indirect_expense_data
+
+
+
+# Recursive function to fetch child accounts with indentation
+def get_child_account_data(account, indent, filters, period_list, account_type):
+	child_accounts = frappe.get_all(
+		"Account",
+		filters={"parent_account": account, "company": filters.get("company")},
+		fields=["name", "is_group"]
+	)
+	
+	data = []
+	row_totals = 0
+	period_totals = {period["key"]: 0 for period in period_list}
+
+	for child in child_accounts:
+		# Add the child account with the current level of indentation
+		child_account_data = [{"account": child["name"], "indent": indent, "row_total": 0}]
+
+		base_filters = {
+			"company": filters.get("company"),
+			"account": child["name"],
+		}
+
+		if filters.get("branch") and len(filters.get("branch")) > 0:
+			base_filters["branch"] = ["in", filters.get("branch")]
+
+		if account_type == "Direct Income":
+			fields = ["SUM(credit) - SUM(debit) as total"]
+		elif account_type == "Indirect Income":
+			fields = ["SUM(credit) - SUM(debit) as total"]
+		elif account_type == "Direct Expense":
+			fields = ["SUM(debit) - SUM(credit) as total"]
+		elif account_type == "Indirect Expense":
+			fields = ["SUM(debit) - SUM(credit) as total"]
+	
+		for period in period_list:
+			period_filters = base_filters.copy()
+			period_filters["posting_date"] = ["between", [period["from_date"], period["to_date"]]]
+		
+			# Fetch GL Entry totals for this period
+			direct_income_total = frappe.get_all(
+				"GL Entry",
+				filters=period_filters,
+				fields=fields
+			)
+
+			period_direct_income_total = direct_income_total[0].total if direct_income_total and direct_income_total[0].total else 0
+
+			# Update period-specific totals
+			child_account_data[0][period["key"]] = period_direct_income_total
+			period_totals[period["key"]] += period_direct_income_total
+
+			# Update row total for the child
+			child_account_data[0]["row_total"] += period_direct_income_total
+
+		# Update row totals
+		row_totals += child_account_data[0]["row_total"]
+
+		if child.get("is_group"):
+			# If child is a group, fetch its children recursively with increased indent
+			grandchild_account_data = get_child_account_data(account=child["name"], indent=indent+1, filters=filters, period_list=period_list, account_type=account_type)
+			
+			# Add grandchildren data to the list
+			child_account_data.extend(grandchild_account_data["data"])
+
+			# Update period totals
+			for period in period_list:
+				child_account_data[0][period["key"]] += grandchild_account_data["period_totals"][period["key"]]
+
+			# Update row totals
+			child_account_data[0]["row_total"] += grandchild_account_data["row_totals"]
+		
+		if child_account_data[0]["row_total"] > 0:
+			data.extend(child_account_data)
+
+	return {
+        "data": data,
+        "row_totals": row_totals,
+        "period_totals": period_totals
+    }

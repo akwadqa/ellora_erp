@@ -107,7 +107,7 @@ def make_and_save_purchase_invoice(source_name):
     return purchase_invoice.name
 
 def make_inter_company_purchase_invoice(source_name, target_doc=None):
-	return make_inter_company_transaction("Sales Invoice", source_name, target_doc)
+    return make_inter_company_transaction("Sales Invoice", source_name, target_doc)
 
 def make_inter_company_transaction(doctype, source_name, target_doc=None):
     if doctype in ["Sales Invoice", "Sales Order"]:
@@ -570,3 +570,21 @@ def make_delivery_note(source_name, target_doc=None):
     set_missing_values(q, target_doc)
 
     return target_doc
+
+# @frappe.whitelist()
+# def register_cash_customer():
+#     cash_customers = frappe.db.sql("""
+#         SELECT DISTINCT TRIM(custom_cash_customer_name) AS custom_cash_customer_name
+#         FROM `tabSales Invoice`
+#         WHERE custom_cash_customer_name IS NOT NULL
+#     """, as_dict=True)
+
+#     for customer in cash_customers:
+#         if customer.custom_cash_customer_name and not frappe.db.exists("Cash Customer", customer.custom_cash_customer_name):
+#             cash_customer = frappe.get_doc({
+#                 "doctype": "Cash Customer",
+#                 "full_name": customer.custom_cash_customer_name
+#             })
+#             cash_customer.insert(ignore_permissions=True)
+#     frappe.db.commit()
+

@@ -11,3 +11,9 @@ frappe.ui.form.on("Material Request", {
 		});
 	},
 })
+
+frappe.ui.form.on("Material Request Item", {
+    item_code: function (frm, cdt, cdn) {
+        frappe.model.set_value(cdt, cdn, "uom", null);
+    }
+});

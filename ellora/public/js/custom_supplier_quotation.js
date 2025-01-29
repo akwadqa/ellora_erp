@@ -11,3 +11,9 @@ frappe.ui.form.on("Supplier Quotation", {
 		});
 	},
 })
+
+frappe.ui.form.on("Supplier Quotation Item", {
+    item_code: function (frm, cdt, cdn) {
+        frappe.model.set_value(cdt, cdn, "uom", null);
+    }
+});
