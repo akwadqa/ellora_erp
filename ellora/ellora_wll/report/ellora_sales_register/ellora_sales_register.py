@@ -10,15 +10,16 @@ from pypika import Order
 
 from erpnext.accounts.party import get_party_account
 from erpnext.accounts.report.utils import (
-	apply_common_conditions,
+	# apply_common_conditions,
 	get_advance_taxes_and_charges,
-	get_journal_entries,
+	# get_journal_entries,
 	get_opening_row,
 	get_party_details,
-	get_payment_entries,
+	# get_payment_entries,
 	get_query_columns,
 	get_taxes_query,
 	get_values_for_columns,
+	filter_invoices_based_on_dimensions
 )
 
 
@@ -31,18 +32,6 @@ def _execute(filters, additional_table_columns=None):
 		filters = frappe._dict({})
 
 
-	# from datetime import datetime
-
-	# if filters.get("from_datetime"):
-	# 	from_datetime = datetime.strptime(filters["from_datetime"], "%Y-%m-%d %H:%M:%S")
-	# 	filters["from_date"] = from_datetime.date()
-	# 	filters["from_time"] = from_datetime.time()
-
-	# if filters.get("to_datetime"):
-	# 	to_datetime = datetime.strptime(filters["to_datetime"], "%Y-%m-%d %H:%M:%S")
-	# 	filters["to_date"] = to_datetime.date()
-	# 	filters["to_time"] = to_datetime.time()
-
 	if filters.get("from_datetime"):
 		from_datetime = get_datetime(filters["from_datetime"])
 		filters["from_date"] = from_datetime.date()
@@ -52,18 +41,6 @@ def _execute(filters, additional_table_columns=None):
 		to_datetime = get_datetime(filters["to_datetime"])
 		filters["to_date"] = to_datetime.date()
 		filters["to_time"] = to_datetime.time()
-
-	frappe.log_error("filters", filters)
-
-	# if filters.get("from_datetime"):
-	# 	from_datetime = get_datetime(filters["from_datetime"])
-	# 	filters["from_date"] = from_datetime.strftime("%Y-%m-%d")  # Convert to string
-	# 	filters["from_time"] = from_datetime.strftime("%H:%M:%S")  # Convert to string
-
-	# if filters.get("to_datetime"):
-	# 	to_datetime = get_datetime(filters["to_datetime"])
-	# 	filters["to_date"] = to_datetime.strftime("%Y-%m-%d")  # Convert to string
-	# 	filters["to_time"] = to_datetime.strftime("%H:%M:%S")  # Convert to string	
 
 
 	include_payments = filters.get("include_payments")
@@ -485,9 +462,11 @@ def get_invoices(filters, additional_query_columns):
 	if filters.get("customer"):
 		query = query.where(si.customer == filters.customer)
 
+	
+	# Customer Group
 	if filters.get("customer_group"):
-		query = query.where(si.customer_group == filters.customer_group)
-
+		groups = get_customer_group_with_children(filters.customer_group)
+		query = query.where(si.customer_group.isin(groups))
 
 	# Include Intercompany Sales
 	if not filters.get("include_intercompany_sales"):
@@ -675,3 +654,142 @@ def get_mode_of_payments(invoice_list):
 			mode_of_payments.setdefault(d.parent, []).append(d.mode_of_payment)
 
 	return mode_of_payments
+
+
+
+
+
+def get_journal_entries(filters, args):
+	je = frappe.qb.DocType("Journal Entry")
+	journal_account = frappe.qb.DocType("Journal Entry Account")
+	query = (
+		frappe.qb.from_(je)
+		.inner_join(journal_account)
+		.on(je.name == journal_account.parent)
+		.select(
+			je.voucher_type.as_("doctype"),
+			je.name,
+			je.posting_date,
+			journal_account.account.as_(args.account),
+			journal_account.party.as_(args.party),
+			journal_account.party.as_(args.party_name),
+			je.bill_no,
+			je.bill_date,
+			je.remark.as_("remarks"),
+			je.total_amount.as_("base_net_total"),
+			je.total_amount.as_("base_grand_total"),
+			je.mode_of_payment,
+			journal_account.project,
+		)
+		.where(
+			(je.voucher_type == "Journal Entry")
+			& (je.docstatus == 1)
+			& (journal_account.party == filters.get(args.party))
+			& (journal_account.account.isin(args.party_account))
+		)
+		.orderby(je.posting_date, je.name, order=Order.desc)
+	)
+	query = apply_common_conditions(filters, query, doctype="Journal Entry", payments=True)
+
+	journal_entries = query.run(as_dict=True)
+	return journal_entries
+
+
+def get_payment_entries(filters, args):
+	pe = frappe.qb.DocType("Payment Entry")
+	query = (
+		frappe.qb.from_(pe)
+		.select(
+			ConstantColumn("Payment Entry").as_("doctype"),
+			pe.name,
+			pe.posting_date,
+			pe[args.account_fieldname].as_(args.account),
+			pe.party.as_(args.party),
+			pe.party_name.as_(args.party_name),
+			pe.remarks,
+			pe.paid_amount.as_("base_net_total"),
+			pe.paid_amount_after_tax.as_("base_grand_total"),
+			pe.mode_of_payment,
+			pe.project,
+			pe.cost_center,
+		)
+		.where(
+			(pe.docstatus == 1)
+			& (pe.party == filters.get(args.party))
+			& (pe[args.account_fieldname].isin(args.party_account))
+		)
+		.orderby(pe.posting_date, pe.name, order=Order.desc)
+	)
+	query = apply_common_conditions(filters, query, doctype="Payment Entry", payments=True)
+	payment_entries = query.run(as_dict=True)
+	return payment_entries
+
+
+def apply_common_conditions(filters, query, doctype, child_doctype=None, payments=False):
+	parent_doc = frappe.qb.DocType(doctype)
+	if child_doctype:
+		child_doc = frappe.qb.DocType(child_doctype)
+
+	join_required = False
+
+	if filters.get("company"):
+		if frappe.db.get_value("Company", filters.get("company"), "is_group"):
+			company_list = frappe.get_all(
+				"Company",
+				filters={"parent_company": filters.get("company")},
+				pluck="name"
+			)
+			query = query.where(parent_doc.company.isin(company_list))
+		else:
+			query = query.where(parent_doc.company == filters.company)
+	if filters.get("from_date"):
+		query = query.where(parent_doc.posting_date >= filters.from_date)
+	if filters.get("to_date"):
+		query = query.where(parent_doc.posting_date <= filters.to_date)
+
+	if payments:
+		if filters.get("cost_center"):
+			query = query.where(parent_doc.cost_center == filters.cost_center)
+	else:
+		if filters.get("cost_center"):
+			query = query.where(child_doc.cost_center == filters.cost_center)
+			join_required = True
+		if filters.get("warehouse"):
+			query = query.where(child_doc.warehouse == filters.warehouse)
+			join_required = True
+		if filters.get("item_group"):
+			query = query.where(child_doc.item_group == filters.item_group)
+			join_required = True
+
+	if not payments:
+		if filters.get("brand"):
+			query = query.where(child_doc.brand == filters.brand)
+			join_required = True
+
+	if join_required:
+		query = query.inner_join(child_doc).on(parent_doc.name == child_doc.parent)
+		query = query.distinct()
+
+	if parent_doc.get_table_name() != "tabJournal Entry":
+		query = filter_invoices_based_on_dimensions(filters, query, parent_doc)
+
+	return query
+
+
+
+
+
+def get_customer_group_with_children(customer_groups):
+	if not isinstance(customer_groups, list):
+		customer_groups = [d.strip() for d in customer_groups.strip().split(",") if d]
+
+	all_customer_groups = []
+	for d in customer_groups:
+		if frappe.db.exists("Customer Group", d):
+			lft, rgt = frappe.db.get_value("Customer Group", d, ["lft", "rgt"])
+			children = frappe.get_all("Customer Group", filters={"lft": [">=", lft], "rgt": ["<=", rgt]})
+			all_customer_groups += [c.name for c in children]
+		else:
+			frappe.throw(_("Customer Group: {0} does not exist").format(d))
+
+	return list(set(all_customer_groups))
