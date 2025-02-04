@@ -184,9 +184,10 @@ doc_events = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "ellora.event.get_events"
-# }
+override_whitelisted_methods = {
+	# "frappe.desk.doctype.event.event.get_events": "ellora.event.get_events",
+    "erpnext.accounts.doctype.bank_clearance.bank_clearance.update_clearance_date": "ellora.overrides.custom_update_clearance_date"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
