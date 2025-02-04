@@ -8,18 +8,22 @@ from frappe.utils import flt
 
 
 def execute(filters=None):
+	if not filters.get("account"):
+		frappe.throw(_("Please select an account."))
+
 	columns, data = [], []
 
 	columns = get_columns(filters)
 
 	opening_balance = get_opening_balance(filters)
+	balance = opening_balance["debit"] - opening_balance["credit"]
 	opening_row = {
 		"posting_date": None,
 		"voucher_no": None,
 		"against_account": "Opening",
 		"debit": opening_balance["debit"],
 		"credit": opening_balance["credit"],
-		"balance": None,
+		"balance": balance,
 		"voucher_type": None,
 		"remarks": None
 	}
@@ -27,7 +31,6 @@ def execute(filters=None):
 
 	gl_entries = get_data(filters)
 
-	balance = 0
 	for entry in gl_entries:
 		balance += entry["debit"] - entry["credit"]
 
