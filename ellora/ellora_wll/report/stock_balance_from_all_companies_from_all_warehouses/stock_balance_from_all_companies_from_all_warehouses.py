@@ -9,7 +9,7 @@ from frappe import _
 def execute(filters=None):
 	columns, data = [], []
 
-	# Get all warehouses dynamically (filtered by company if provided)
+	# Get all warehouses
 	warehouse_filters = {}
 	if filters.get("company"):
 		warehouse_filters["company"] = filters["company"]
@@ -146,5 +146,6 @@ def get_data(filters, warehouse_list):
 
 	# Convert to list format for report
 	report_data = list(item_stock_map.values())
-
+	frappe.log_error("item_stock_map", item_stock_map)
+	frappe.log_error("report_data", report_data)
 	return report_data
