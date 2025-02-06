@@ -38,12 +38,14 @@ function stock_monitor_dialog() {
 
 function get_stock_info(item, dialog) {
     const args = {
+        doctype: cur_frm.doctype,
+        name: cur_frm.doc.name,
         item: item
     };
 
-    if (cur_frm && cur_frm.doctype === 'Sales Invoice') {
-        args.sales_invoice = cur_frm.doc.name;
-    }
+    // if (cur_frm && cur_frm.doctype === 'Sales Invoice') {
+    //     args.sales_invoice = cur_frm.doc.name;
+    // }
 
     frappe.call({
         method: 'ellora.api.get_stock_info',

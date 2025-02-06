@@ -34,7 +34,8 @@ function get_stock_info(item, dialog) {
     frappe.call({
         method: 'ellora.api.get_stock_info',
         args: {
-            sales_invoice: cur_frm.doc.name,
+            doctype: cur_frm.doctype,
+            name: cur_frm.doc.name,
             item: item
         },
         callback: function(r) {

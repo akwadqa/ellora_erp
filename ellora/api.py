@@ -1,14 +1,14 @@
 import frappe
 
 @frappe.whitelist()
-def get_stock_info(sales_invoice=None, item=None):
+def get_stock_info(doctype=None, name=None, item=None):
     if item:
         filters = 'a.item_code = %s'
         values = [item]
-    elif sales_invoice:
+    elif doctype and name:
         item_list = frappe.get_all(
-            doctype="Sales Invoice Item",
-            filters={"parent": sales_invoice},
+            doctype= str(doctype) + " Item",
+            filters={"parent": name},
             fields=["item_code"]
         )
         if not item_list:
