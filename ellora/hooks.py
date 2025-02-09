@@ -8,11 +8,10 @@ app_license = "mit"
 
 # Includes in <head>
 # ------------------
-fixtures = [
-    {"dt": "Property Setter", "filters": [["module", "=", "Ellora WLL"]]},
-    {"dt": "Custom Field", "filters": [["module", "=", "Ellora WLL"]]}
-    
-]
+#fixtures = [
+#    {"dt": "Property Setter", "filters": [["module", "=", "Ellora WLL"]]},
+#    {"dt": "Custom Field", "filters": [["module", "=", "Ellora WLL"]]}
+#    ]
 # include js, css files in header of desk.html
 # app_include_css = "/assets/ellora/css/ellora.css"
 app_include_js = "/assets/ellora/js/custom_shortcuts.js"

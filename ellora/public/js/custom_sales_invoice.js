@@ -243,6 +243,48 @@ frappe.ui.form.on("Sales Invoice", {
 			};
 		});
 	},
+
+    onload_post_render: function(frm) {
+        frm.remove_custom_button("Delivery Note", "Get Items From");
+        // setTimeout(() => {
+        //     frm.remove_custom_button("Delivery Note", "Get Items From");
+        // },500);
+    },
+
+    refresh: function (frm) {
+        // Show buttons only when pos view is active
+		if (cint(frm.doc.docstatus == 0) && cur_frm.page.current_view_name !== "pos" && !frm.doc.is_return) {
+            frm.add_custom_button(
+                __("Delivery Note."),
+                function () {
+                    erpnext.utils.map_current_doc({
+                        method: "erpnext.stock.doctype.delivery_note.delivery_note.make_sales_invoice",
+                        source_doctype: "Delivery Note",
+                        target: frm,
+                        date_field: "posting_date",
+                        setters: {
+                            customer: frm.doc.customer || undefined,
+                            custom_cash_customer_name: frm.doc.custom_cash_customer_name || undefined
+                        },
+                        get_query: function () {
+                            var filters = {
+                                docstatus: 1,
+                                company: frm.doc.company,
+                                is_return: 0,
+                            };
+                            if (frm.doc.customer) filters["customer"] = frm.doc.customer;
+                            if (frm.doc.custom_cash_customer_name) filters["custom_cash_customer_name"] = frm.doc.custom_cash_customer_name;
+                            return {
+                                query: "ellora.queries.custom_get_delivery_notes_to_be_billed",
+                                filters: filters,
+                            };
+                        },
+                    });
+                },
+                __("Get Items From")
+            );
+        }
+    },
     
     on_submit: function(frm) {
         if (frm.doc.is_internal_customer) {
