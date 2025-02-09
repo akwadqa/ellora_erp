@@ -12,8 +12,8 @@ frappe.ui.form.on("Stock Entry", {
 	}
 })
 
-frappe.ui.form.on("Stock Entry Detail", {
-    item_code: function (frm, cdt, cdn) {
-        frappe.model.set_value(cdt, cdn, "uom", null);
-    }
-});
+// frappe.ui.form.on("Stock Entry Detail", {
+//     item_code: function (frm, cdt, cdn) {
+//         frappe.model.set_value(cdt, cdn, "uom", null);
+//     }
+// });
