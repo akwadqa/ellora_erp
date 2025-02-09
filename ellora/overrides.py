@@ -25,7 +25,9 @@ class CustomBankClearance(BankClearance):
 
                 payment_entry = frappe.get_doc(d.payment_document, d.payment_entry)
                 payment_entry.db_set("clearance_date", d.clearance_date)
-                payment_entry.db_set("custom_cheque_status", "Cleared")
+
+                if d.payment_document == "Payment Entry":
+                    payment_entry.db_set("custom_cheque_status", "Cleared")
 
                 clearance_date_updated = True
 
