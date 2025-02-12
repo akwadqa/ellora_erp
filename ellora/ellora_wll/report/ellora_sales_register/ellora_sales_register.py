@@ -482,6 +482,7 @@ def get_invoices(filters, additional_query_columns):
 	# Include Return Sales
 	if not filters.get("include_return_sales"):
 		query = query.where(si.is_return == 0)
+	
 
 	query = get_conditions(filters, query, "Sales Invoice")
 	query = apply_common_conditions(
