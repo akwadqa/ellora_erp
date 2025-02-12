@@ -91,7 +91,13 @@ frappe.query_reports["Ellora Sales Register"] = {
 			label: __("Include Return Sales"),
 			fieldtype: "Check",
 			default: 0,
-		}
+		},
+		{
+			fieldname: "ignore_time",
+			label: __("Ignore Time"),
+			fieldtype: "Check",
+			default: 0,
+		},
 	],
 };
 

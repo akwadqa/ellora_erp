@@ -22,6 +22,8 @@ from erpnext.accounts.report.utils import (
 	filter_invoices_based_on_dimensions
 )
 
+from datetime import datetime
+
 
 def execute(filters=None):
 	return _execute(filters)
@@ -46,7 +48,9 @@ def _execute(filters, additional_table_columns=None):
 	include_payments = filters.get("include_payments")
 	if filters.get("include_payments") and not filters.get("customer"):
 		frappe.throw(_("Please select a customer for fetching payments."))
+	
 	invoice_list = get_invoices(filters, get_query_columns(additional_table_columns))
+
 	if filters.get("include_payments"):
 		invoice_list += get_payments(filters)
 
@@ -433,6 +437,7 @@ def get_invoices(filters, additional_query_columns):
 			ConstantColumn("Sales Invoice").as_("doctype"),
 			si.name,
 			si.posting_date,
+			si.posting_time,
 			si.debit_to,
 			si.project,
 			si.customer,
@@ -476,10 +481,11 @@ def get_invoices(filters, additional_query_columns):
 	if not filters.get("include_return_sales"):
 		query = query.where(si.is_return == 0)
 
-	if filters.get("from_time"):
-		query = query.where(si.posting_time >= filters.from_time)
-	if filters.get("to_time"):
-		query = query.where(si.posting_time <= filters.to_time)
+
+	# if filters.get("from_time"):
+	# 	query = query.where(si.posting_time >= filters.from_time)
+	# if filters.get("to_time"):
+	# 	query = query.where(si.posting_time <= filters.to_time)
 
 
 	query = get_conditions(filters, query, "Sales Invoice")
@@ -488,6 +494,26 @@ def get_invoices(filters, additional_query_columns):
 	)
 
 	invoices = query.run(as_dict=True)
+
+	if not filters.get("ignore_time"):
+		from_time = filters.get("from_time")
+		to_time = filters.get("to_time")
+		if from_time or to_time:
+			def is_within_time_range(invoice):
+				posting_time = invoice.get("posting_time")
+
+				# Convert timedelta to time
+				posting_time = (datetime.min + posting_time).time()
+
+				if from_time and posting_time < from_time:
+					return False
+				if to_time and posting_time > to_time:
+					return False
+				return True
+
+			invoices = [inv for inv in invoices if is_within_time_range(inv)]
+
+
 	return invoices
 
 
