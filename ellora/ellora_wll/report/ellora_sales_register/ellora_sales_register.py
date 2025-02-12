@@ -492,8 +492,13 @@ def get_invoices(filters, additional_query_columns):
 
 
 	if not filters.get("ignore_time"):
-		from_datetime = get_datetime(filters["from_datetime"])
-		to_datetime = get_datetime(filters["to_datetime"])
+		from_datetime = None
+		to_datetime = None
+
+		if filters.get("from_datetime"):
+			from_datetime = get_datetime(filters["from_datetime"])
+		if filters.get("to_datetime"):
+			to_datetime = get_datetime(filters["to_datetime"])
 
 		if from_datetime or to_datetime:
 			def is_within_datetime_range(invoice):
