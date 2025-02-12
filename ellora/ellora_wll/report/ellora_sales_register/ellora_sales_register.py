@@ -33,16 +33,18 @@ def _execute(filters, additional_table_columns=None):
 	if not filters:
 		filters = frappe._dict({})
 
+	
+	if filters.get("from_datetime") and filters.get("to_datetime"):
+		if filters.get("from_datetime") > filters.get("to_datetime"):
+			frappe.throw(_("From Time should be before To Time."))
 
 	if filters.get("from_datetime"):
 		from_datetime = get_datetime(filters["from_datetime"])
 		filters["from_date"] = from_datetime.date()
-		filters["from_time"] = from_datetime.time()
 
 	if filters.get("to_datetime"):
 		to_datetime = get_datetime(filters["to_datetime"])
 		filters["to_date"] = to_datetime.date()
-		filters["to_time"] = to_datetime.time()
 
 
 	include_payments = filters.get("include_payments")
@@ -481,13 +483,6 @@ def get_invoices(filters, additional_query_columns):
 	if not filters.get("include_return_sales"):
 		query = query.where(si.is_return == 0)
 
-
-	# if filters.get("from_time"):
-	# 	query = query.where(si.posting_time >= filters.from_time)
-	# if filters.get("to_time"):
-	# 	query = query.where(si.posting_time <= filters.to_time)
-
-
 	query = get_conditions(filters, query, "Sales Invoice")
 	query = apply_common_conditions(
 		filters, query, doctype="Sales Invoice", child_doctype="Sales Invoice Item"
@@ -495,25 +490,24 @@ def get_invoices(filters, additional_query_columns):
 
 	invoices = query.run(as_dict=True)
 
+
 	if not filters.get("ignore_time"):
-		from_time = filters.get("from_time")
-		to_time = filters.get("to_time")
-		if from_time or to_time:
-			def is_within_time_range(invoice):
-				posting_time = invoice.get("posting_time")
+		from_datetime = get_datetime(filters["from_datetime"])
+		to_datetime = get_datetime(filters["to_datetime"])
 
-				# Convert timedelta to time
-				posting_time = (datetime.min + posting_time).time()
+		if from_datetime or to_datetime:
+			def is_within_datetime_range(invoice):
+				posting_datetime = datetime.combine(invoice["posting_date"], (datetime.min + invoice["posting_time"]).time())
 
-				if from_time and posting_time < from_time:
+				if from_datetime and posting_datetime < from_datetime:
 					return False
-				if to_time and posting_time > to_time:
+				if to_datetime and posting_datetime > to_datetime:
 					return False
 				return True
 
-			invoices = [inv for inv in invoices if is_within_time_range(inv)]
+			invoices = [inv for inv in invoices if is_within_datetime_range(inv)]
 
-
+	
 	return invoices
 
 
