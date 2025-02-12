@@ -36,7 +36,7 @@ def _execute(filters, additional_table_columns=None):
 	
 	if filters.get("from_datetime") and filters.get("to_datetime"):
 		if filters.get("from_datetime") > filters.get("to_datetime"):
-			frappe.throw(_("From Time should be before To Time."))
+			frappe.throw(_("From Date should be before To Date."))
 
 	if filters.get("from_datetime"):
 		from_datetime = get_datetime(filters["from_datetime"])
