@@ -57,7 +57,6 @@ class ReceivablePayableReport:
 		self.get_columns()
 		self.get_data()
 		self.get_chart_data()
-		frappe.log_error("self.data", self.data)
 		return self.columns, self.data, None, self.chart, None, self.skip_total_row
 
 	def set_defaults(self):
@@ -286,7 +285,7 @@ class ReceivablePayableReport:
 		# as we can use this to filter out invoices without outstanding
 		cumulative_balance = 0
 
-		frappe.log_error("p", self.currency_precision)
+
 		for _key, row in self.voucher_balance.items():
 			row.outstanding = flt(row.invoiced - row.paid - row.credit_note, self.currency_precision)
 			
@@ -294,7 +293,6 @@ class ReceivablePayableReport:
 			cumulative_balance += row.outstanding
 			# row.cumulative_balance = "{:,.2f}".format(cumulative_balance) + " " + self.company_currency
 			row.cumulative_balance = f"{cumulative_balance:,.2f} {self.company_currency}"
-
 
 
 			row.outstanding_in_account_currency = flt(
