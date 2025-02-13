@@ -57,15 +57,22 @@ class ReceivablePayableReport:
 		self.get_columns()
 		self.get_data()
 		self.get_chart_data()
-		frappe.log_error("company", self.filters.get("company"))
+		frappe.log_error("self.data", self.data)
 		return self.columns, self.data, None, self.chart, None, self.skip_total_row
 
 	def set_defaults(self):
 		if not self.filters.get("company"):
-			self.filters.company = frappe.db.get_single_value("Global Defaults", "default_company")
-		self.company_currency = frappe.get_cached_value(
-			"Company", self.filters.get("company"), "default_currency"
-		)
+			company_list = frappe.get_all(
+				"Company",
+				pluck="name"
+			)
+			self.company_list = company_list
+
+			self.company_currency = frappe.db.get_single_value("Global Defaults", "default_currency")
+		else:
+			self.company_currency = frappe.get_cached_value(
+				"Company", self.filters.get("company"), "default_currency"
+			)
 		self.currency_precision = get_currency_precision() or 2
 		self.dr_or_cr = "debit" if self.filters.account_type == "Receivable" else "credit"
 		self.account_type = self.filters.account_type
@@ -277,8 +284,19 @@ class ReceivablePayableReport:
 	def build_data(self):
 		# set outstanding for all the accumulated balances
 		# as we can use this to filter out invoices without outstanding
+		cumulative_balance = 0
+
+		frappe.log_error("p", self.currency_precision)
 		for _key, row in self.voucher_balance.items():
 			row.outstanding = flt(row.invoiced - row.paid - row.credit_note, self.currency_precision)
+			
+			
+			cumulative_balance += row.outstanding
+			# row.cumulative_balance = "{:,.2f}".format(cumulative_balance) + " " + self.company_currency
+			row.cumulative_balance = f"{cumulative_balance:,.2f} {self.company_currency}"
+
+
+
 			row.outstanding_in_account_currency = flt(
 				row.invoiced_in_account_currency
 				- row.paid_in_account_currency
@@ -690,7 +708,7 @@ class ReceivablePayableReport:
 		filters = {
 			"is_return": 1,
 			"docstatus": 1,
-			"company": self.filters.company,
+			"company": self.filters.company if self.filters.company else ["in", self.company_list],
 			"update_outstanding_for_self": 0,
 		}
 		or_filters = {}
@@ -854,6 +872,8 @@ class ReceivablePayableReport:
 	def add_common_filters(self):
 		if self.filters.company:
 			self.qb_selection_filter.append(self.ple.company == self.filters.company)
+		else:
+			self.qb_selection_filter.append(self.ple.company.isin(self.company_list))
 
 		if self.filters.finance_book:
 			self.qb_selection_filter.append(self.ple.finance_book == self.filters.finance_book)
@@ -871,7 +891,7 @@ class ReceivablePayableReport:
 			accounts = [
 				d.name
 				for d in frappe.get_all(
-					"Account", filters={"account_type": self.account_type, "company": self.filters.company}
+					"Account", filters={"account_type": self.account_type, "company": self.filters.company if self.filters.company else ["in", self.company_list]}
 				)
 			]
 
@@ -1060,6 +1080,11 @@ class ReceivablePayableReport:
 			self.add_column(_("Debit Note"), fieldname="credit_note")
 		self.add_column(_("Outstanding Amount"), fieldname="outstanding")
 
+
+		if not self.filters.get("group_by_party"):
+			self.add_column(_("Cumulative Balance"), fieldname="cumulative_balance", fieldtype="Data", align="right")
+
+
 		self.setup_ageing_columns()
 
 		self.add_column(
@@ -1103,7 +1128,7 @@ class ReceivablePayableReport:
 		if self.filters.show_remarks:
 			self.add_column(label=_("Remarks"), fieldname="remarks", fieldtype="Text", width=200)
 
-	def add_column(self, label, fieldname=None, fieldtype="Currency", options=None, width=120):
+	def add_column(self, label, fieldname=None, fieldtype="Currency", options=None, width=120, align=None):
 		if not fieldname:
 			fieldname = scrub(label)
 		if fieldtype == "Currency":
@@ -1112,7 +1137,7 @@ class ReceivablePayableReport:
 			width = 90
 
 		self.columns.append(
-			dict(label=label, fieldname=fieldname, fieldtype=fieldtype, options=options, width=width)
+			dict(label=label, fieldname=fieldname, fieldtype=fieldtype, options=options, width=width, align=align)
 		)
 
 	def setup_ageing_columns(self):
@@ -1154,19 +1179,24 @@ class ReceivablePayableReport:
 
 	def get_exchange_rate_revaluations(self):
 		je = qb.DocType("Journal Entry")
-		results = (
+		query = (
 			qb.from_(je)
 			.select(je.name)
 			.where(
-				(je.company == self.filters.company)
-				& (je.posting_date.lte(self.filters.report_date))
+				(je.posting_date.lte(self.filters.report_date))
 				& (
 					(je.voucher_type == "Exchange Rate Revaluation")
 					| (je.voucher_type == "Exchange Gain Or Loss")
 				)
 			)
-			.run()
 		)
+		if self.filters.company:
+			query = query.where(je.company == self.filters.company)
+		else:
+			query = query.where(je.company.isin(self.company_list))
+		
+		results = query.run()
+
 		self.err_journals = [x[0] for x in results] if results else []
 
 
