@@ -252,10 +252,13 @@ frappe.ui.form.on("Sales Invoice", {
     },
 
     refresh: function (frm) {
+        setTimeout(() => {
+            frm.remove_custom_button("Delivery Note", "Get Items From");
+        }, 10);
         // Show buttons only when pos view is active
 		if (cint(frm.doc.docstatus == 0) && cur_frm.page.current_view_name !== "pos" && !frm.doc.is_return) {
             frm.add_custom_button(
-                __("Delivery Note."),
+                __("Delivery Notes"),
                 function () {
                     erpnext.utils.map_current_doc({
                         method: "erpnext.stock.doctype.delivery_note.delivery_note.make_sales_invoice",
