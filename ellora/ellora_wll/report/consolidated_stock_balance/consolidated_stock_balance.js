@@ -1,7 +1,8 @@
 // Copyright (c) 2025, Akwad Programming and contributors
 // For license information, please see license.txt
 
-frappe.query_reports["Stock Balance from All Companies from All Warehouses"] = {
+
+frappe.query_reports["Consolidated Stock Balance"] = {
     "filters": [
         {
             fieldname: "item",
