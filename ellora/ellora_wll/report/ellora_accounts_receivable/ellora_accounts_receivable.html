@@ -1,10 +1,13 @@
 <style>
 	.print-format {
-		padding: 4mm;
+		padding: 8mm;
 		font-size: 7.5pt !important;
 	}
 	.print-format td {
 		vertical-align: middle !important;
+	}
+	.print-format th {
+		color: black !important;
 	}
 	</style>
 
@@ -65,8 +68,8 @@
 	<hr style="margin: 0;">
 
 	
-	<table class="table table-bordered">
-		<thead>
+	<table class="table">
+		<thead style="background-color: #DCDCDC;">
 			<tr>
 				<th style="width: 4%;">{%= __("No") %}</th>
 				<th style="width: 10%">{%= __("Date") %}</th>
@@ -82,20 +85,21 @@
 		</thead>
 		<tbody>
 			{% for(var i=0, l=data.length; i<l; i++) { %}
-				<tr>
-					{% if(!data[i]["is_total_row"]) { %}
+				{% if(!data[i]["is_total_row"]) { %}
+					<tr>
 						<td>
 							{%= i+1 %}
 						</td>
 						<td>
 							{%= frappe.datetime.str_to_user(data[i]["posting_date"]) %}
 						</td>
-					{% } else { %}
+				{% } else { %}
+					<tr style="background-color: #DCDCDC;">
 						<td></td>
 						<td>
 							<b>{%= __("Total") %}</b>
 						</td>
-					{% } %}
+				{% } %}
 					<td>
 						{%= data[i]["voucher_no"] %}
 					</td>
@@ -112,7 +116,6 @@
 						{%= format_currency(data[i]["outstanding"], data[i]["currency"]) %}
 					</td>
 					<td style="text-align: right">
-						<!-- {%= format_currency(data[i]["cumulative_balance"], data[i]["currency"]) %} -->
 						{%= data[i]["cumulative_balance"] %}
 					</td>
 					<td style="text-align: right">
@@ -126,5 +129,22 @@
 		</tbody>
 	</table>
 
-	
-	<p class="text-right text-muted">{{ __("Printed On ") }}{%= frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string()) %}</p>
+
+	<p style="font-weight: bold;">
+		Please compare the above information to your records, complete the statement below, and send this letter back to us duly signed and stamped. Above mentioned outstanding amount will be considered as correct unless any intimation or objection received by us within 5 days from the date of this letter.
+		<br>
+		<br>
+		You may confirm the balance by E-mail to accounts@elloragroupwil.com
+		<br>
+		An early response shall be highly appreciated. Thanking you for your kind cooperation.
+		<br>
+		<br>
+		<br>
+		Yours Faithfully,
+		<br>
+		For Ellora Group WLL
+		<br>
+		<br>
+		<br>
+		(Authorized Signatory)
+	</p>
