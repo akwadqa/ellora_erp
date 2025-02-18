@@ -80,7 +80,9 @@
 				<th style="width: 11%; text-align: right;">{%= __("Outstanding Amt") %}</th>
 				<th style="width: 11%; text-align: right;">{%= __("Cumulative Balance") %}</th>
 				<th style="width: 4%; text-align: right;">{%= __("Days") %}</th>
-				<th style="width: 10%; text-align: right;">{%= __("PO No") %}</th>
+				{% if(report.report_name === "Ellora Accounts Receivable") { %}
+					<th style="width: 10%; text-align: right;">{%= __("PO No") %}</th>
+				{% } %}
 			</tr>
 		</thead>
 		<tbody>
@@ -121,9 +123,11 @@
 					<td style="text-align: right">
 						{%= data[i]["age"] %}
 					</td>
-					<td style="text-align: right">
-						{%= data[i]["po_no"] %}
-					</td>
+					{% if(report.report_name === "Ellora Accounts Receivable") { %}
+						<td style="text-align: right">
+							{%= data[i]["po_no"] %}
+						</td>
+					{% } %}
 				</tr>
 			{% } %}
 		</tbody>
