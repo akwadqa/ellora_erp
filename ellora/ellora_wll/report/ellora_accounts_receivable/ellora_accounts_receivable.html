@@ -5,9 +5,11 @@
 	}
 	.print-format td {
 		vertical-align: middle !important;
+		padding: 2px 5px !important;
 	}
 	.print-format th {
 		color: black !important;
+		padding: 2px 5px !important;
 	}
 	</style>
 
@@ -120,9 +122,13 @@
 					<td style="text-align: right">
 						{%= data[i]["cumulative_balance"] %}
 					</td>
-					<td style="text-align: right">
-						{%= data[i]["age"] %}
-					</td>
+					{% if(!data[i]["is_total_row"]) { %}
+						<td style="text-align: right">
+							{%= data[i]["age"] %}
+						</td>
+					{% } else { %}
+						<td></td>
+					{% } %}
 					{% if(report.report_name === "Ellora Accounts Receivable") { %}
 						<td style="text-align: right">
 							{%= data[i]["po_no"] %}
