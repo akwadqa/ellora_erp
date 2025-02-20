@@ -152,6 +152,7 @@ def get_data(filters):
 
 	query = f""" 
 		SELECT 
+			gl.name AS name,
 			gl.posting_date AS posting_date,
 			gl.voucher_no AS voucher_no,
 			gl.against AS against_account,
@@ -167,21 +168,54 @@ def get_data(filters):
 			gl.posting_date, gl.account, gl.creation;
 	"""
 
-	data = frappe.db.sql(query, {"company": company, "account": account, "from_date": from_date, "to_date": to_date}, as_dict=1)
+	gl_entry_list = frappe.db.sql(query, {"company": company, "account": account, "from_date": from_date, "to_date": to_date}, as_dict=1)
 
+	frappe.log_error("gl_entry_list", gl_entry_list)
+
+	data = []
+	if gl_entry_list:
+		for gl_entry in gl_entry_list:
+			child_query = f""" 
+				SELECT 
+					gl.posting_date AS posting_date,
+					gl.voucher_no AS voucher_no,
+					gl.against AS against_account,
+					gl.debit AS debit,
+					gl.credit AS credit,
+					gl.voucher_type AS voucher_type,
+					gl.remarks AS remarks
+				FROM 
+					`tabGL Entry` gl
+				WHERE 
+					gl.voucher_no = %(voucher_no)s AND 
+					gl.name != %(name)s AND 
+					is_cancelled = 0
+				ORDER BY 
+					gl.posting_date, gl.account, gl.creation;
+			"""
+
+			child_gl_entry_list = frappe.db.sql(child_query, {"voucher_no": gl_entry.voucher_no, "name": gl_entry.name}, as_dict=1)
+			
+			if child_gl_entry_list:
+				data.extend(child_gl_entry_list)
+			else:
+				data.append(gl_entry)
+	
 	frappe.log_error("data", data)
+
 	return data
 
 
 def get_opening_balance(filters):
-	opening_balance = frappe.db.sql("""
+	company_filter = "company = %(company)s AND" if filters.get("company") else ""
+
+	gl_entry_list = frappe.db.sql(f"""
 		SELECT
-			SUM(debit) AS total_debit,
-			SUM(credit) AS total_credit
+			name, voucher_no, debit, credit
 		FROM
 			`tabGL Entry`
 		WHERE
-			company = %(company)s AND 
+			{company_filter}
 			account IN %(account)s AND 
 			(posting_date < %(from_date)s OR is_opening = 'Yes') AND 
 			is_cancelled = 0
@@ -191,10 +225,29 @@ def get_opening_balance(filters):
 		"from_date": filters.get("from_date"),
 	}, as_dict=1)
 
-	if opening_balance and opening_balance[0]:
-		return {
-			"debit": flt(opening_balance[0].get("total_debit", 0)),
-            "credit": flt(opening_balance[0].get("total_credit", 0))
-		}
-	else:
-		return {"debit": 0, "credit": 0}
+	opening_balance = {"debit": 0, "credit": 0}
+	if gl_entry_list:
+		for gl_entry in gl_entry_list:
+			child_gl_entry_list = frappe.db.sql(f""" 
+				SELECT 
+					debit, credit
+				FROM 
+					`tabGL Entry` gl
+				WHERE 
+					gl.voucher_no = %(voucher_no)s AND 
+					gl.name != %(name)s AND 
+					is_cancelled = 0
+			""", {
+				"voucher_no": gl_entry.voucher_no, 
+				"name": gl_entry.name
+			}, as_dict=1)
+			
+			if child_gl_entry_list:
+				for child_gl_entry in child_gl_entry_list:
+					opening_balance["debit"] += child_gl_entry.get("debit", 0)
+					opening_balance["credit"] += child_gl_entry.get("credit", 0)
+			else:
+				opening_balance["debit"] += gl_entry.get("debit", 0)
+				opening_balance["credit"] += gl_entry.get("credit", 0)
+			
+	return opening_balance
