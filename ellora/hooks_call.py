@@ -3,6 +3,10 @@ from frappe import _
 
 
 def validate_minimum_selling_rate(doc, method):
+    if doc.doctype == "Sales Invoice":
+        if doc.is_internal_customer:
+            return
+        
     if doc.items:
         for item in doc.items:
             if item.rate:
