@@ -199,6 +199,97 @@ function format_date(date_string) {
 
 
 
+frappe.ui.form.on("Quotation Item", "custom_item_purchase_history", function(frm, cdt, cdn) {
+    let child_doc = locals[cdt][cdn];
+    let item_code = child_doc.item_code;
+
+    const dialog = new frappe.ui.Dialog({
+        title: __('Item Purchase History'),
+        size: "extra-large",
+        fields: [
+            {
+                fieldname: 'supplier',
+                label: __('Supplier'),
+                fieldtype: 'Link',
+                options: 'Supplier',
+                reqd: 0,
+                change: function() {
+                    get_item_purchase_history(dialog.get_value('supplier'), dialog.get_value('item'), dialog);
+                }
+            },
+            {
+                fieldname: 'item',
+                label: __('Item'),
+                fieldtype: 'Link',
+                options: 'Item',
+                reqd: 0,
+                default: item_code,
+                change: function() {
+                    get_item_purchase_history(dialog.get_value('supplier'), dialog.get_value('item'), dialog);
+                }
+            },
+            {
+                fieldname: 'items',
+                label: __('Items'),
+                fieldtype: 'Table',
+                fields: [
+                    { fieldtype: 'Data', fieldname: 'supplier_name', label: __('Supplier Name'), in_list_view: 1, read_only: 1, columns: 2 },
+                    { fieldtype: 'Link', options: 'Purchase Invoice', fieldname: 'purchase_invoice', label: __('Purchase Invoice'), in_list_view: 1, read_only: 1, columns: 2 },
+                    { fieldtype: 'Data', fieldname: 'posting_date', label: __('Posting Date'), in_list_view: 1, read_only: 1, columns: 1 },
+                    { fieldtype: 'Link', options: 'Item', fieldname: 'item_code', label: __('Item Code'), in_list_view: 1, read_only: 1, columns: 2 },
+                    { fieldtype: 'Data', fieldname: 'qty', label: __('Quantity'), in_list_view: 1, read_only: 1, columns: 1 },
+                    { fieldtype: 'Currency', fieldname: 'rate', label: __('Rate'), in_list_view: 1, read_only: 1, columns: 1 },
+                    { fieldtype: 'Link', options: 'UOM', fieldname: 'uom', label: __('UOM'), in_list_view: 1, read_only: 1, columns: 1 }
+                ],
+                data: [],
+                get_data: function() {
+                    return [];
+                }
+            }
+        ],
+        primary_action_label: __('Update Rate'),
+        primary_action: function() {
+            const selected_items = dialog.fields_dict.items.grid.get_selected_children();
+            if (selected_items.length > 0) {
+                update_item_rate(selected_items);
+                dialog.hide();
+            } else {
+                frappe.msgprint(__('Please select an item to update the rate'));
+            }
+        }
+    });
+
+    dialog.show();
+    get_item_purchase_history(dialog.get_value('supplier'), dialog.get_value('item'), dialog);
+});
+
+
+
+function get_item_purchase_history(supplier, item, dialog) {
+    frappe.call({
+        method: 'ellora.api.get_purchase_invoice_item_sales_history',
+        args: {
+            supplier: supplier,
+            item: item
+        },
+        callback: function(r) {
+            if (r.message) {
+                // Format the date
+                r.message.forEach(row => {
+                    row.posting_date = format_date(row.posting_date);
+                });
+                const table_field = dialog.fields_dict.items;
+                table_field.grid.df.data = r.message;
+                table_field.grid.refresh();
+            }
+        }
+    });
+}
+
+
+
+
+
 frappe.ui.form.on("Quotation", {
     setup: function (frm) {
 		["items"].forEach((d) => {
