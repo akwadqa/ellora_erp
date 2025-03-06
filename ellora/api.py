@@ -1,7 +1,7 @@
 import frappe
 
 @frappe.whitelist()
-def get_stock_info(doctype=None, name=None, item=None):
+def get_stock_info(doctype=None, name=None, item=None, uom=None):
     if item:
         filters = 'a.item_code = %s'
         values = [item]
@@ -31,6 +31,15 @@ def get_stock_info(doctype=None, name=None, item=None):
             {filters}
     """
     data = frappe.db.sql(query, values, as_dict=True)
+
+    if data and uom:
+        for item in data:
+            if frappe.db.exists("UOM Conversion Detail", {"uom": uom, "parent": item["item_code"]}):
+                conversion_factor = frappe.db.get_value("UOM Conversion Detail", {"uom": uom, "parent": item["item_code"]}, "conversion_factor")
+                frappe.log_error("conversion_factor", conversion_factor)
+                item["stock_uom"] = uom
+                item["actual_qty"] = round(item["actual_qty"] / conversion_factor, 2)
+                item["reserved_qty"] = round(item["reserved_qty"] / conversion_factor, 2)
 
     return data
 

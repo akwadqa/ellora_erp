@@ -14,7 +14,17 @@ frappe.ui.form.on("Quotation Item", "custom_stock_info", function(frm, cdt, cdn)
                 reqd: 0,
                 default: item_code,
                 change: function() {
-                    get_stock_info(dialog.get_value('item'), dialog);
+                    get_stock_info(dialog.get_value('item'), dialog.get_value('uom'), dialog);
+                }
+            },
+            {
+                fieldname: 'uom',
+                label: __('UOM'),
+                fieldtype: 'Link',
+                options: 'UOM',
+                reqd: 0,
+                change: function() {
+                    get_stock_info(dialog.get_value('item'), dialog.get_value('uom'), dialog);
                 }
             },
             {
@@ -26,17 +36,18 @@ frappe.ui.form.on("Quotation Item", "custom_stock_info", function(frm, cdt, cdn)
     });
 
     dialog.show();
-    get_stock_info(dialog.get_value('item'), dialog);
+    get_stock_info(dialog.get_value('item'), dialog.get_value('uom'), dialog);
 
 });
 
-function get_stock_info(item, dialog) {
+function get_stock_info(item, uom, dialog) {
     frappe.call({
         method: 'ellora.api.get_stock_info',
         args: {
             doctype: cur_frm.doctype,
             name: cur_frm.doc.name,
-            item: item
+            item: item,
+            uom: uom
         },
         callback: function(r) {
             let html = '';

@@ -21,7 +21,17 @@ function stock_monitor_dialog() {
                 options: 'Item',
                 reqd: 0,
                 change: function() {
-                    get_stock_info(dialog.get_value('item'), dialog);
+                    get_stock_info(dialog.get_value('item'), dialog.get_value('uom'), dialog);
+                }
+            },
+            {
+                fieldname: 'uom',
+                label: __('UOM'),
+                fieldtype: 'Link',
+                options: 'UOM',
+                reqd: 0,
+                change: function() {
+                    get_stock_info(dialog.get_value('item'), dialog.get_value('uom'), dialog);
                 }
             },
             {
@@ -33,14 +43,15 @@ function stock_monitor_dialog() {
     });
 
     dialog.show();
-    get_stock_info(dialog.get_value('item'), dialog);
+    get_stock_info(dialog.get_value('item'), dialog.get_value('uom'), dialog);
 }
 
-function get_stock_info(item, dialog) {
+function get_stock_info(item, uom, dialog) {
     const args = {
         doctype: cur_frm.doctype,
         name: cur_frm.doc.name,
-        item: item
+        item: item,
+        uom: uom
     };
 
     // if (cur_frm && cur_frm.doctype === 'Sales Invoice') {
