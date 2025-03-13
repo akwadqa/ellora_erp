@@ -124,7 +124,7 @@ def get_data(filters):
         ON
             si.name = pi.inter_company_invoice_reference
         
-        WHERE si.is_internal_customer = 1 
+        WHERE si.is_internal_customer = 1 AND si.docstatus != 2
     """
 
     conditions = []
