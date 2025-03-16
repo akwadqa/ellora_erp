@@ -224,6 +224,13 @@ frappe.ui.form.on("Quotation Item", "custom_item_purchase_history", function(frm
                 fieldtype: 'Link',
                 options: 'Supplier',
                 reqd: 0,
+                get_query: function() {
+                    return {
+                        filters: {
+                            'is_internal_supplier': 0
+                        }
+                    };
+                },
                 change: function() {
                     get_item_purchase_history(dialog.get_value('supplier'), dialog.get_value('item'), dialog);
                 }

@@ -464,7 +464,7 @@ def get_purchase_invoice_item_sales_history(supplier=None, item=None):
         JOIN
             `tabSupplier` s ON pi.supplier = s.name
         WHERE
-            pi.docstatus = 1{filters}
+            pi.docstatus = 1 AND s.is_internal_supplier = 0{filters}
         ORDER BY
             pi.posting_date DESC
     """
