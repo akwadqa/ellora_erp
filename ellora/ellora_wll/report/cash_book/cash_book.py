@@ -20,7 +20,7 @@ def execute(filters=None):
 	opening_row = {
 		"posting_date": None,
 		"voucher_no": None,
-		"against_account": "Opening",
+		"against_account": "Main Cash FS",
 		"debit": opening_balance["debit"],
 		"credit": opening_balance["credit"],
 		"balance": balance,
