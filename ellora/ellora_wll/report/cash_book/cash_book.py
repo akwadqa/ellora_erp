@@ -20,7 +20,7 @@ def execute(filters=None):
 	opening_row = {
 		"posting_date": None,
 		"voucher_no": None,
-		"against_account": "Main Cash FS",
+		"against_account": _("Main Cash FS"),
 		"debit": opening_balance["debit"],
 		"credit": opening_balance["credit"],
 		"balance": balance,
@@ -50,7 +50,7 @@ def execute(filters=None):
 	total_row = {
 		"posting_date": None,
 		"voucher_no": None,
-		"against_account": "Total",
+		"against_account": _("Total"),
 		"debit": total_debit,
 		"credit": total_credit,
 		"balance": None,
@@ -62,7 +62,7 @@ def execute(filters=None):
 	closing_row = {
 		"posting_date": None,
 		"voucher_no": None,
-		"against_account": "Closing (Opening + Total)",
+		"against_account": _("Closing (Opening + Total)"),
 		"debit": opening_balance["debit"] + total_debit,
 		"credit": opening_balance["credit"] + total_credit,
 		"balance": None,
