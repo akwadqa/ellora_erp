@@ -175,13 +175,11 @@ def get_data(filters):
 		if gl_entry["voucher_type"] == "Expense Entry":
 			expense_entry_list = frappe.db.sql("""
 				SELECT 
-					expense_account, SUM(amount) as total_amount
+					expense_account, amount, notes
 				FROM 
 					`tabExpense Entry Detail`
 				WHERE 
 					parent = %s
-				GROUP BY 
-					expense_account
 			""", (gl_entry["voucher_no"]), as_dict=True)
 
 			for expense_entry in expense_entry_list:
@@ -191,9 +189,9 @@ def get_data(filters):
 					"voucher_no": gl_entry["voucher_no"],
 					"against_account": expense_entry["expense_account"],
 					"debit": 0,
-					"credit": expense_entry["total_amount"],
+					"credit": expense_entry["amount"],
 					"voucher_type": gl_entry["voucher_type"],
-					"remarks": gl_entry["remarks"]
+					"remarks": expense_entry["notes"]
 				})
 		else:
 			final_data.append(gl_entry)
