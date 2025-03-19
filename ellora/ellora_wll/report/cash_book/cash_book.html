@@ -20,55 +20,68 @@
 		<thead style="background-color: #DCDCDC;">
 			<tr>
 				<th style="width: 3%;">{%= __("No") %}</th>
-				<th style="width: 7%">{%= __("Posting Date") %}</th>
+				<th style="width: 10%">{%= __("Posting Date") %}</th>
 				<th style="width: 10%">{%= __("Voucher No") %}</th>
-				<th style="width: 15%;">{%= __("Against Account") %}</th>
-				<th style="width: 10%; text-align: right;">{%= __("Debit") %}</th>
-				<th style="width: 10%; text-align: right;">{%= __("Credit") %}</th>
-				<th style="width: 10%; text-align: right;">{%= __("Balance") %}</th>
-				<th style="width: 10%;">{%= __("Voucher Type") %}</th>
-				<th style="width: 25%;">{%= __("Remarks") %}</th>
+				<th style="width: 23%;">{%= __("Against Account") %}</th>
+				<th style="width: 8%; text-align: right;">{%= __("Debit") %}</th>
+				<th style="width: 8%; text-align: right;">{%= __("Credit") %}</th>
+				<th style="width: 8%; text-align: right;">{%= __("Balance") %}</th>
+				<th style="width: 30%;">{%= __("Remarks") %}</th>
 			</tr>
 		</thead>
 		<tbody>
 			{% for(var i=0, l=data.length; i<l; i++) { %}
-                {% if(i >= l - 2) { %}
-                    <tr style="background-color: #DCDCDC; font-weight: bold;">
-                {% } else { %}
-                    <tr>
-                {% } %}
-                    {% if(i == 0 || i >= l - 2) { %}
-                        <td></td>
+                {% if(i != l - 2) { %}
+
+
+                    {% if(i >= l - 2) { %}
+                        <tr style="background-color: #DCDCDC; font-weight: bold;">
                     {% } else { %}
-                        <td>
-                            {%= i %}
-                        </td>
+                        <tr>
                     {% } %}
-                    <td>
-                        {%= data[i]["posting_date"] %}
-                    </td>
-                    <td>
-                        {%= data[i]["voucher_no"] %}
-                    </td>
-                    <td>
-                        {%= data[i]["against_account"] %}
-                    </td>
-                    <td style="text-align: right;">
-                        {%= format_currency(data[i]["debit"]) %}
-                    </td>
-                    <td style="text-align: right;">
-                        {%= format_currency(data[i]["credit"]) %}
-                    </td>
-                    <td style="text-align: right;">
-                        {%= format_currency(data[i]["balance"]) %}
-                    </td>
-                    <td>
-                        {%= data[i]["voucher_type"] %}
-                    </td>
-                    <td>
-                        {%= data[i]["remarks"] %}
-                    </td>
-                </tr>
-			{% } %}
+                        {% if(i == 0 || i >= l - 2) { %}
+                            <td></td>
+                        {% } else { %}
+                            <td>
+                                {%= i %}
+                            </td>
+                        {% } %}
+                        <td>
+                            {%= frappe.datetime.str_to_user(data[i]["posting_date"]) %}
+                        </td>
+                        <td>
+                            {%= data[i]["voucher_no"] %}
+                        </td>
+                        <td>
+                            {%= data[i]["against_account"] %}
+                        </td>
+                        {% if(i == l - 1) { %}
+                            <td style="text-align: right;">
+                                {%= format_currency(data[i]["debit"]) %}
+                            </td>
+                            <td style="text-align: right;">
+                                {%= format_currency(data[i]["credit"]) %}
+                            </td>
+                            <td style="text-align: right;">
+                                {%= format_currency(data[i]["debit"] - data[i]["credit"]) %}
+                            </td>
+                        {% } else { %}
+                            <td style="text-align: right;">
+                                {%= format_number(data[i]["debit"], null, 2) %}
+                            </td>
+                            <td style="text-align: right;">
+                                {%= format_number(data[i]["credit"], null, 2) %}
+                            </td>
+                            <td style="text-align: right;">
+                                {%= format_number(data[i]["balance"], null, 2) %}
+                            </td>
+                        {% } %}
+                        <td>
+                            {%= data[i]["remarks"] %}
+                        </td>
+                    </tr>
+                {% } %}
+
+            {% } %}
 		</tbody>
 	</table>
