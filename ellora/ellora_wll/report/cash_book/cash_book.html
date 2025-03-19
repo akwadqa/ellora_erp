@@ -14,7 +14,9 @@
 	}
 </style>
     
-    <h3 style="width: 100%; text-align: center; font-weight: bold;">Cash Book Report of {%= __(filters.account) %} Between {%= frappe.datetime.str_to_user(filters.from_date) %} And {%= frappe.datetime.str_to_user(filters.to_date) %}</h3>
+    <h3 style="width: 100%; text-align: center;">Cash Book Report</h3>
+    <h5 style="font-weight: bold;">Account: {%= __(filters.account) %}</h5>
+    <h5 style="font-weight: bold;">Between {%= frappe.datetime.str_to_user(filters.from_date) %} And {%= frappe.datetime.str_to_user(filters.to_date) %}</h5>
 
     <table class="table table-bordered">
 		<thead style="background-color: #DCDCDC;">
