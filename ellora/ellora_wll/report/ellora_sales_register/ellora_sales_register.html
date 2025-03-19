@@ -1,0 +1,94 @@
+<style>
+	.print-format {
+        padding: 4mm !important;
+		font-size: 9pt !important;
+	}
+
+	.print-format td {
+		padding: 2px 2px !important;
+	}
+
+	.print-format th {
+		color: black !important;
+        font-weight: bold !important;
+		padding: 2px 2px !important;
+	}
+
+    @media print {
+        .table th {
+            background-color: #DCDCDC !important;
+        }
+    }
+</style>
+    
+    <h3 style="width: 100%; text-align: center;">Sales Register Report</h3>
+    {% if(filters.company) { %}
+        <h5 style="font-weight: bold;">Company: {%= filters.company %}</h5>
+    {% } %}
+    {% if(filters.customer) { %}
+        <h5 style="font-weight: bold;">Customer: {%= filters.customer %}</h5>
+    {% } %}
+    {% if(filters.customer_group && filters.customer_group.length > 0) { %}
+        <h5 style="font-weight: bold;">Customer Group: {%= filters.customer_group %}</h5>
+    {% } %}
+    {% if(filters.item_group) { %}
+        <h5 style="font-weight: bold;">Item Group: {%= filters.item_group %}</h5>
+    {% } %}
+    {% if(filters.from_datetime && filters.to_datetime) { %}
+        <h5 style="font-weight: bold;">Between {%= frappe.datetime.str_to_user(filters.from_datetime) %} And {%= frappe.datetime.str_to_user(filters.to_datetime) %}</h5>
+    {% } %}
+
+    <table class="table table-bordered">
+		<thead style="background-color: #DCDCDC;">
+			<tr>
+				<th style="width: 3%;">{%= __("No") %}</th>
+				<th style="width: 11%">{%= __("Voucher Type") %}</th>
+				<th style="width: 11%">{%= __("Voucher No") %}</th>
+                <th style="width: 11%">{%= __("Posting Date") %}</th>
+				<th style="width: 22%;">{%= __("Customer") %}</th>
+                <th style="width: 22%;">{%= __("Customer Name") %}</th>
+				<th style="width: 10%; text-align: right;">{%= __("Net Total") %}</th>
+				<th style="width: 10%; text-align: right;">{%= __("Grand Total") %}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for(var i=0, l=data.length; i<l; i++) { %}
+                {% if(i == l - 1) { %}
+                    <tr style="font-weight: bold;">
+                {% } else { %}
+                    <tr>
+                {% } %}
+                    {% if(i != l-1) { %}
+                        <td>
+                            {%= i+1 %}
+                        </td>
+                    {% } else { %}
+                        <td>
+                            
+                        </td>
+                    {% } %}
+                    <td>
+                        {%= data[i]["voucher_type"] %}
+                    </td>
+                    <td>
+                        {%= data[i]["voucher_no"] %}
+                    </td>
+                    <td>
+                        {%= frappe.datetime.str_to_user(data[i]["posting_date"]) %}
+                    </td>
+                    <td>
+                        {%= data[i]["customer"] %}
+                    </td>
+                    <td>
+                        {%= data[i]["customer_name"] %}
+                    </td>
+                    <td style="text-align: right;">
+                        {%= format_number(data[i]["net_total"], null, 2) %}
+                    </td>
+                    <td style="text-align: right;">
+                        {%= format_number(data[i]["grand_total"], null, 2) %}
+                    </td>
+                </tr>
+            {% } %}
+		</tbody>
+	</table>

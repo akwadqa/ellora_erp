@@ -12,6 +12,12 @@
         font-weight: bold !important;
 		padding: 2px 2px !important;
 	}
+
+    @media print {
+        .table th {
+            background-color: #DCDCDC !important;
+        }
+    }
 </style>
     
     <h3 style="width: 100%; text-align: center;">Cash Book Report</h3>
@@ -34,14 +40,12 @@
 		<tbody>
 			{% for(var i=0, l=data.length; i<l; i++) { %}
                 {% if(i != l - 2) { %}
-
-
-                    {% if(i >= l - 2) { %}
-                        <tr style="background-color: #DCDCDC; font-weight: bold;">
+                    {% if(i == l - 1) { %}
+                        <tr style="font-weight: bold;">
                     {% } else { %}
                         <tr>
                     {% } %}
-                        {% if(i == 0 || i >= l - 2) { %}
+                        {% if(i == 0 || i == l - 1) { %}
                             <td></td>
                         {% } else { %}
                             <td>
@@ -83,7 +87,6 @@
                         </td>
                     </tr>
                 {% } %}
-
             {% } %}
 		</tbody>
 	</table>
