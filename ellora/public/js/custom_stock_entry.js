@@ -9,5 +9,15 @@ frappe.ui.form.on("Stock Entry", {
 				};
 			};
 		});
-	}
+	},
+
+	posting_date: function(frm) {
+        let today = frappe.datetime.get_today();
+        let postingDate = frm.doc.posting_date;
+
+        if (postingDate > today) {
+            frappe.msgprint(__('Posting Date cannot be in the future.'));
+            frm.set_value('posting_date', today);
+        }
+    }
 })
