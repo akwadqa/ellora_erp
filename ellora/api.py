@@ -45,11 +45,14 @@ def get_stock_info(doctype=None, name=None, item=None, uom=None):
 
 
 @frappe.whitelist()
-def get_item_sales_history(customer=None, item=None):
+def get_item_sales_history(customer=None, cash_customer=None, item=None):
     filters = []
     values = []
 
-    if customer:
+    if cash_customer:
+        filters.append('si.custom_cash_customer_name = %s')
+        values.append(cash_customer)
+    elif customer:
         filters.append('si.customer = %s')
         values.append(customer)
 

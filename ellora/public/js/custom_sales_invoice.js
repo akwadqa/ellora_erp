@@ -162,6 +162,7 @@ function get_item_sales_history(customer, item, dialog) {
         method: 'ellora.api.get_item_sales_history',
         args: {
             customer: customer,
+            cash_customer: cur_frm.doc.custom_cash_customer_name,
             item: item
         },
         callback: function(r) {

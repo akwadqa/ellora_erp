@@ -176,8 +176,13 @@ function item_sales_history_dialog(doctype) {
 
 function get_item_sales_history(doctype, customer, item, dialog) {
     let method;
+    let args = {
+        customer: customer,
+        item: item
+    };
     if (doctype == "Sales Invoice") {
         method = 'ellora.api.get_item_sales_history';
+        args.cash_customer = cur_frm.doc.custom_cash_customer_name;
     } else if (doctype == "Delivery Note") {
         method = 'ellora.api.get_delivery_note_item_sales_history';
     } else if (doctype == "Quotation") {
@@ -190,10 +195,7 @@ function get_item_sales_history(doctype, customer, item, dialog) {
 
     frappe.call({
         method: method,
-        args: {
-            customer: customer,
-            item: item
-        },
+        args: args,
         callback: function(r) {
             if (r.message) {
                 // Format the date
