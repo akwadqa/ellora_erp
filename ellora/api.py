@@ -36,7 +36,6 @@ def get_stock_info(doctype=None, name=None, item=None, uom=None):
         for item in data:
             if frappe.db.exists("UOM Conversion Detail", {"uom": uom, "parent": item["item_code"]}):
                 conversion_factor = frappe.db.get_value("UOM Conversion Detail", {"uom": uom, "parent": item["item_code"]}, "conversion_factor")
-                frappe.log_error("conversion_factor", conversion_factor)
                 item["stock_uom"] = uom
                 item["actual_qty"] = round(item["actual_qty"] / conversion_factor, 2)
                 item["reserved_qty"] = round(item["reserved_qty"] / conversion_factor, 2)
@@ -523,11 +522,19 @@ def make_delivery_note(source_name, target_doc=None):
     }
 
     def set_missing_values(source, target):
-        frappe.log_error("smv")
         target.run_method("set_missing_values")
         target.run_method("set_po_nos")
         target.run_method("calculate_taxes_and_totals")
         target.run_method("set_use_serial_batch_fields")
+
+        if source.party_name:
+            target.update({"customer": source.party_name})
+
+        if source.custom_branch:
+            target.update({"branch": source.custom_branch})
+        
+        if source.transaction_date:
+            target.update({"po_date": source.transaction_date})
 
         if source.company_address:
             target.update({"company_address": source.company_address})
