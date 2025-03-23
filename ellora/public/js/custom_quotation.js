@@ -23,6 +23,14 @@ frappe.ui.form.on("Quotation Item", "custom_stock_info", function(frm, cdt, cdn)
                 fieldtype: 'Link',
                 options: 'UOM',
                 reqd: 0,
+                get_query: function() {
+                    if (dialog.get_value('item')) {
+                        return {
+                            query: "ellora.api.get_item_uoms",
+                            filters: { value: dialog.get_value('item') },
+                        };
+                    }
+                },
                 change: function() {
                     get_stock_info(dialog.get_value('item'), dialog.get_value('uom'), dialog);
                 }

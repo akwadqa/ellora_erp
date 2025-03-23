@@ -30,6 +30,14 @@ function stock_monitor_dialog() {
                 fieldtype: 'Link',
                 options: 'UOM',
                 reqd: 0,
+                get_query: function() {
+                    if (dialog.get_value('item')) {
+                        return {
+                            query: "ellora.api.get_item_uoms",
+                            filters: { value: dialog.get_value('item') },
+                        };
+                    }
+                },
                 change: function() {
                     get_stock_info(dialog.get_value('item'), dialog.get_value('uom'), dialog);
                 }
