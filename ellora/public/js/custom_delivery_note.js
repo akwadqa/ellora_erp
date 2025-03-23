@@ -223,6 +223,15 @@ frappe.ui.form.on("Delivery Note", {
 		});
 	},
 
+    onload_post_render: function(frm) {
+        frm.set_query("item_code", "items", function () {
+            return {
+                query: "erpnext.controllers.queries.item_query",
+                filters: { is_sales_item: 1, customer: frm.doc.customer, has_variants: 0, warehouse: frm.doc.set_warehouse},
+            };
+        });
+    },
+
     posting_date: function(frm) {
         let today = frappe.datetime.get_today();
         let postingDate = frm.doc.posting_date;

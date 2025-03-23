@@ -153,7 +153,22 @@ from frappe.utils import nowdate
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def custom_item_query(doctype, txt, searchfield, start, page_len, filters, as_dict=False):
+def custom_item_query(doctype, txt, searchfield, start, page_len, filters, as_dict=False, warehouse=None):
+	frappe.log_error("filters", filters)
+
+	def get_bin_qty(item_code, warehouse):
+		bin_qty = frappe.db.sql(
+			"""select actual_qty from `tabBin`
+			where item_code = %s and warehouse = %s
+			limit 1""",
+			(item_code, warehouse),
+			as_dict=1,
+		)
+
+		return bin_qty[0].actual_qty or 0 if bin_qty else 0
+
+	warehouse = filters.pop('warehouse', None)
+
 	page_len = 50
 	columns = ", tabItem.item_name"
 
@@ -218,7 +233,7 @@ def custom_item_query(doctype, txt, searchfield, start, page_len, filters, as_di
 		# scan description only if items are less than 50000
 		description_cond = "or tabItem.description LIKE %(txt)s"
 
-	return frappe.db.sql(
+	item_query_result = frappe.db.sql(
 		"""select
 			tabItem.name {columns}
 		from tabItem
@@ -250,3 +265,15 @@ def custom_item_query(doctype, txt, searchfield, start, page_len, filters, as_di
 		},
 		as_dict=as_dict,
 	)
+	if warehouse:
+		item_query_result = list(map(list, item_query_result))
+		for index, item in enumerate(item_query_result):
+			item_code = item[0]
+			bin_qty = get_bin_qty(item_code, warehouse)
+
+			# Only append the "Stock" string for the first 5 items
+			if index < 5:
+				stock = f"<b>Stock = {bin_qty or '0'}</b>"
+				item.append(stock)
+
+	return item_query_result

@@ -321,6 +321,15 @@ frappe.ui.form.on("Purchase Order", {
 			};
 		});
 	},
+
+    onload_post_render: function(frm) {
+        frm.set_query("item_code", "items", function () {
+            return {
+                query: "erpnext.controllers.queries.item_query",
+                filters: { is_purchase_item: 1, supplier: frm.doc.supplier, has_variants: 0, warehouse: frm.doc.set_warehouse},
+            };
+        });
+    }
 })
 
 frappe.ui.form.on("Purchase Order Item", {

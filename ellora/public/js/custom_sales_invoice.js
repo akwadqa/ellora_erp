@@ -256,11 +256,29 @@ frappe.ui.form.on("Sales Invoice", {
 		});
 	},
 
+    // onload: function(frm) {
+    //     console.log(frm.doc.set_warehouse)
+
+    //     frm.set_query("item_code", "items", function () {
+    //         console.log(frm.doc.set_warehouse)
+    //         return {
+    //             query: "erpnext.controllers.queries.item_query",
+    //             filters: { is_sales_item: 1, customer: frm.doc.customer, has_variants: 0, warehouse:  frm.doc.set_warehouse},
+    //         };
+    //     });
+    // },
+
     onload_post_render: function(frm) {
         frm.remove_custom_button("Delivery Note", "Get Items From");
         // setTimeout(() => {
         //     frm.remove_custom_button("Delivery Note", "Get Items From");
         // },500);
+        frm.set_query("item_code", "items", function () {
+            return {
+                query: "erpnext.controllers.queries.item_query",
+                filters: { is_sales_item: 1, customer: frm.doc.customer, has_variants: 0, warehouse: frm.doc.set_warehouse},
+            };
+        });
     },
 
     refresh: function (frm) {
