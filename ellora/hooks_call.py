@@ -23,3 +23,13 @@ def clear_warehouse_fields(doc, method):
     if doc.doctype == "Purchase Receipt":
         for item in doc.items:
             item.rejected_warehouse = None
+
+
+
+
+
+def uncheck_update_stock(doc, method):
+    if doc.items:
+        if doc.items[0].delivery_note:
+            if doc.update_stock == 1:
+                doc.update_stock = 0

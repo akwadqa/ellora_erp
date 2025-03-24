@@ -145,7 +145,8 @@ doc_events = {
         "validate": "ellora.hooks_call.validate_minimum_selling_rate"
 	},
     "Sales Invoice": {
-        "validate": "ellora.hooks_call.validate_minimum_selling_rate"
+        "validate": "ellora.hooks_call.validate_minimum_selling_rate",
+        "before_validate": "ellora.hooks_call.uncheck_update_stock"
 	},
     "Delivery Note": {
         "validate": "ellora.hooks_call.validate_minimum_selling_rate"
