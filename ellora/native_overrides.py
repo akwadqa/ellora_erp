@@ -153,7 +153,7 @@ from frappe.utils import nowdate
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def custom_item_query(doctype, txt, searchfield, start, page_len, filters, as_dict=False, warehouse=None):
+def custom_item_query(doctype, txt, searchfield, start, page_len, filters, as_dict=False):
 	frappe.log_error("filters", filters)
 
 	def get_bin_qty(item_code, warehouse):
@@ -166,8 +166,8 @@ def custom_item_query(doctype, txt, searchfield, start, page_len, filters, as_di
 		)
 
 		return bin_qty[0].actual_qty or 0 if bin_qty else 0
-
-	warehouse = filters.pop('warehouse', None)
+	
+	warehouse = filters.pop('warehouse', None) if filters else None
 
 	page_len = 50
 	columns = ", tabItem.item_name"
