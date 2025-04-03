@@ -28,6 +28,16 @@ frappe.query_reports["Consolidated Stock Balance"] = {
             label: __("Brand"),
             fieldtype: "Link",
             options: "Brand"
+        },
+        {
+            fieldname: "warehouse",
+            label: __("Warehouse"),
+            fieldtype: "Link",
+            options: "Warehouse",
+            get_query: () => {
+				var company = frappe.query_report.get_filter_value("company");
+				return company ? { filters: { company: company } } : {};
+			},
         }
     ]
 };

@@ -9,16 +9,36 @@ from frappe import _
 def execute(filters=None):
 	columns, data = [], []
 
-	# Get all warehouses
-	warehouse_filters = {}
-	if filters.get("company"):
-		warehouse_filters["company"] = filters["company"]
-        
-	warehouse_list = frappe.get_all(
-		"Warehouse",
-		filters=warehouse_filters,
-		pluck="name"
-	)
+	# warehouse_list = []
+	# if filters.get("warehouse"):
+	# 	warehouse_list.append(filters.get("warehouse"))
+	# else:
+	# 	# Get all warehouses
+	# 	warehouse_filters = {}
+	# 	if filters.get("company"):
+	# 		warehouse_filters["company"] = filters["company"]
+			
+	# 	warehouse_list = frappe.get_all(
+	# 		"Warehouse",
+	# 		filters=warehouse_filters,
+	# 		pluck="name"
+	# 	)
+
+	
+	warehouse = filters.get("warehouse")
+	if warehouse:
+		warehouse_list = [warehouse]
+	elif filters.get("company"): # If no warehouse, check for company-based filtering
+		warehouse_list = frappe.get_all(
+			"Warehouse",
+			filters={"company": filters["company"]},
+			pluck="name"
+		)
+	else: # Get all warehouses
+		warehouse_list = frappe.get_all(
+			"Warehouse", 
+			pluck="name"
+		)
 
 	columns = get_columns(warehouse_list)
 	data = get_data(filters, warehouse_list)
