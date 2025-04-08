@@ -101,12 +101,25 @@ def get_columns(warehouse_list):
 
 
 def get_data(filters, warehouse_list):
+
+	def get_child_item_groups(item_group):
+		lft, rgt = frappe.db.get_value("Item Group", item_group, ["lft", "rgt"])
+		return frappe.get_all(
+			"Item Group",
+			filters={
+				"lft": [">=", lft],
+				"rgt": ["<=", rgt]
+			},
+			pluck="name"
+		)
+
 	# Prepare item filters
 	item_filters = {}
 	if filters.get("item"):
 		item_filters["name"] = filters["item"]
 	if filters.get("item_group"):
-		item_filters["item_group"] = filters["item_group"]
+		child_groups = get_child_item_groups(filters["item_group"])
+		item_filters["item_group"] = ["in", child_groups]
 	if filters.get("brand"):
 		item_filters["brand"] = filters["brand"]
 
