@@ -47,7 +47,7 @@
                 <th style="width: 11%">{%= __("Posting Date") %}</th>
 				<th style="width: 22%;">{%= __("Customer") %}</th>
                 <th style="width: 22%;">{%= __("Customer Name") %}</th>
-				<th style="width: 10%; text-align: right;">{%= __("Net Total") %}</th>
+				<th style="width: 10%; text-align: right;">{%= __("Rounded Total") %}</th>
 				<th style="width: 10%; text-align: right;">{%= __("Grand Total") %}</th>
 			</tr>
 		</thead>
@@ -83,7 +83,7 @@
                         {%= data[i]["customer_name"] %}
                     </td>
                     <td style="text-align: right;">
-                        {%= format_number(data[i]["net_total"], null, 2) %}
+                        {%= format_number(data[i]["rounded_total"], null, 2) %}
                     </td>
                     <td style="text-align: right;">
                         {%= format_number(data[i]["grand_total"], null, 2) %}
