@@ -82,9 +82,16 @@
                                 {%= format_number(data[i]["balance"], null, 2) %}
                             </td>
                         {% } %}
-                        <td>
+                        {%
+                            var remarks = cstr(data[i]["remarks"]);
+                            var display_text = remarks.length > 50 ? 
+                                (data[i].debit != 0 ? data[i]["against_account"] + " - " + format_currency(data[i]["debit"]) : data[i]["against_account"] + " - " + format_currency(data[i]["credit"])) 
+                                : remarks;
+                        %}
+                        <td>{{ display_text }}</td>
+                        <!-- <td>
                             {%= data[i]["remarks"] %}
-                        </td>
+                        </td> -->
                     </tr>
                 {% } %}
             {% } %}
