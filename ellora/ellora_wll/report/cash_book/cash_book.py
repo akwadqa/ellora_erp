@@ -191,8 +191,31 @@ def get_data(filters):
 					"debit": 0,
 					"credit": expense_entry["amount"],
 					"voucher_type": gl_entry["voucher_type"],
-					"remarks": expense_entry["notes"]
+					"remarks": expense_entry["notes"] or gl_entry["remarks"]
 				})
+		
+		elif gl_entry["voucher_type"] == "Journal Entry":
+			journal_entry_list = frappe.db.sql("""
+				SELECT 
+					account, debit, credit, user_remark
+				FROM 
+					`tabJournal Entry Account`
+				WHERE 
+					parent = %s AND account NOT IN %s
+			""", (gl_entry["voucher_no"], tuple(account)), as_dict=True)
+
+			for journal_entry in journal_entry_list:
+				final_data.append({
+					"name": gl_entry["name"],
+					"posting_date": gl_entry["posting_date"],
+					"voucher_no": gl_entry["voucher_no"],
+					"against_account": journal_entry["account"],
+					"debit": journal_entry["credit"],
+					"credit": journal_entry["debit"],
+					"voucher_type": gl_entry["voucher_type"],
+					"remarks": journal_entry.get("user_remark") or gl_entry["remarks"]
+				})
+		
 		else:
 			final_data.append(gl_entry)
 
