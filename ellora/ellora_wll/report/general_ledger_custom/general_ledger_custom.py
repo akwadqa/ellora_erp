@@ -152,6 +152,26 @@ def get_result(filters, account_details):
 
 	result = get_result_as_list(data, filters)
 
+	if filters.get("show_remarks"):
+		for gl_entry in result:
+			if "voucher_type" in gl_entry and gl_entry["voucher_type"] == "Expense Entry" and gl_entry["debit"] > 0:
+				expense_entry_list = frappe.db.sql("""
+					SELECT 
+						expense_account, amount, notes, cost_center, branch
+					FROM 
+						`tabExpense Entry Detail`
+					WHERE 
+						parent = %s
+				""", (gl_entry["voucher_no"]), as_dict=True)
+
+				remarks_list = []
+				for expense_entry in expense_entry_list:
+					if expense_entry["expense_account"] == gl_entry["account"]:
+						if expense_entry.get("notes"):
+							remarks_list.append(expense_entry["notes"])
+
+				gl_entry["remarks"] = " | ".join(remarks_list)
+
 	return result
 
 
